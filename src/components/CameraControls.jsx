@@ -7,12 +7,15 @@ export default function CameraControls({ client, pvPrefix }) {
 
   const toggleAcquire = () => {
     if (!pvPrefix || !client) return;
-    client.put(`${pvPrefix}:Acquire`, isAcquiring ? 0 : 1);
+    const newVal = isAcquiring ? 0 : 1;
+    console.log(`[PVWS] Write ${pvPrefix}:Acquire = ${newVal}`);
+    client.put(`${pvPrefix}:Acquire`, newVal);
   };
 
   const setExposure = (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && pvPrefix && client) {
+      console.log(`[PVWS] Write ${pvPrefix}:AcquireTime = ${val}`);
       client.put(`${pvPrefix}:AcquireTime`, val);
     }
   };
@@ -20,6 +23,7 @@ export default function CameraControls({ client, pvPrefix }) {
   const setGain = (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && pvPrefix && client) {
+      console.log(`[PVWS] Write ${pvPrefix}:Gain = ${val}`);
       client.put(`${pvPrefix}:Gain`, val);
     }
   };
@@ -46,6 +50,8 @@ export default function CameraControls({ client, pvPrefix }) {
           step="0.001"
           value={exposureVal}
           onChange={setExposure}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         />
         <span className="control-value">{Number(exposureVal).toFixed(3)}s</span>
       </label>
@@ -59,6 +65,8 @@ export default function CameraControls({ client, pvPrefix }) {
           step="1"
           value={gainVal}
           onChange={setGain}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         />
         <span className="control-value">{Number(gainVal).toFixed(0)}</span>
       </label>

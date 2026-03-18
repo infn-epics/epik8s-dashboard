@@ -1,14 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import CameraControls from './CameraControls';
+import { useCameraPvs } from '../hooks/usePv';
 
 export default function CameraTile({ cameras, client, initialCamera }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [streamEnabled, setStreamEnabled] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const imgRef = useRef(null);
 
   const camera = cameras[selectedIdx] || initialCamera || cameras[0];
+
+  // Subscribe to Stream1:EnableCallbacks PV for stream status
+  const { streamEnable } = useCameraPvs(client, camera?.pvPrefix);
+  const streamEnabled = streamEnable?.value === 1 || streamEnable?.value === '1' || streamEnable?.value === 'Enable';
   if (!camera) {
     return (
       <div className="camera-tile empty">
@@ -21,12 +26,21 @@ export default function CameraTile({ cameras, client, initialCamera }) {
 
   const handleCameraChange = (e) => {
     const idx = parseInt(e.target.value, 10);
+    setSwitching(true);
     setSelectedIdx(idx);
     setHasError(false);
   };
 
+  // Clear switching state when new image loads
+  useEffect(() => {
+    setSwitching(true);
+  }, [camera?.pvPrefix]);
+
   const toggleStream = () => {
-    setStreamEnabled((prev) => !prev);
+    if (!client || !camera?.pvPrefix) return;
+    const newVal = streamEnabled ? 0 : 1;
+    console.log(`[PVWS] Write ${camera.pvPrefix}:Stream1:EnableCallbacks = ${newVal}`);
+    client.put(`${camera.pvPrefix}:Stream1:EnableCallbacks`, newVal);
     setHasError(false);
   };
 
@@ -72,19 +86,22 @@ export default function CameraTile({ cameras, client, initialCamera }) {
             hasError ? (
               <div className="stream-error">
                 <span>⚠ Stream unavailable</span>
-                <button onClick={() => setHasError(false)}>Retry</button>
+                <button onClick={() => { setHasError(false); setSwitching(false); }}>Retry</button>
               </div>
+            ) : switching ? (
+              <div className="stream-connecting">Connecting…</div>
             ) : (
               <img
                 ref={imgRef}
                 className="stream-img"
                 src={streamSrc}
                 alt={`${camera.deviceName} stream`}
+                onLoad={() => setSwitching(false)}
                 onError={() => setHasError(true)}
               />
             )
           ) : (
-            <div className="stream-disabled">Stream paused</div>
+            <div className="stream-disabled">Stream disabled</div>
           )}
           <div className="camera-label">{camera.pvPrefix}</div>
         </div>

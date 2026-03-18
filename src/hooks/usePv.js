@@ -41,6 +41,7 @@ export function useCameraPvs(client, pvPrefix) {
   const acquire = usePv(client, pvPrefix ? `${pvPrefix}:Acquire` : null);
   const acquireTime = usePv(client, pvPrefix ? `${pvPrefix}:AcquireTime` : null);
   const gain = usePv(client, pvPrefix ? `${pvPrefix}:Gain` : null);
+  const streamEnable = usePv(client, pvPrefix ? `${pvPrefix}:Stream1:EnableCallbacks` : null);
 
-  return { acquire, acquireTime, gain };
+  return { acquire, acquireTime, gain, streamEnable };
 }

@@ -138,6 +138,7 @@ export default class PvwsClient {
   /* ---- write ---- */
 
   put(pv, value) {
+    console.log(`[PVWS] Sending write: ${pv} = ${JSON.stringify(value)}`);
     this._send({ type: 'write', pv, value });
   }
 

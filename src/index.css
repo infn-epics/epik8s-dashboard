@@ -261,6 +261,7 @@ body,
 }
 
 .stream-disabled,
+.stream-connecting,
 .stream-error {
   display: flex;
   flex-direction: column;
