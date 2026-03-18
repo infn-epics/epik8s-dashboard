@@ -88,17 +88,19 @@ export default function CameraTile({ cameras, client, initialCamera }) {
                 <span>⚠ Stream unavailable</span>
                 <button onClick={() => { setHasError(false); setSwitching(false); }}>Retry</button>
               </div>
-            ) : switching ? (
-              <div className="stream-connecting">Connecting…</div>
             ) : (
-              <img
-                ref={imgRef}
-                className="stream-img"
-                src={streamSrc}
-                alt={`${camera.deviceName} stream`}
-                onLoad={() => setSwitching(false)}
-                onError={() => setHasError(true)}
-              />
+              <>
+                {switching && <div className="stream-connecting">Connecting…</div>}
+                <img
+                  ref={imgRef}
+                  className="stream-img"
+                  src={streamSrc}
+                  alt={`${camera.deviceName} stream`}
+                  style={switching ? { visibility: 'hidden', position: 'absolute' } : {}}
+                  onLoad={() => setSwitching(false)}
+                  onError={() => setHasError(true)}
+                />
+              </>
             )
           ) : (
             <div className="stream-disabled">Stream disabled</div>
