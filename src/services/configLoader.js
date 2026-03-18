@@ -45,8 +45,15 @@ export async function loadCamerasFromConfig(yamlPath = '/values.yaml') {
   const namespace = config.namespace || beamline;
   const domain = config.epik8namespace || '';
 
-  // Extract pvws service configuration
-  const pvwsCfg = config.epicsConfiguration?.services?.camarray?.pvws || {};
+  // Extract pvws service configuration — check camarray.pvws first, then any service with a pvws block
+  const services = config.epicsConfiguration?.services || {};
+  let pvwsCfg = services.camarray?.pvws;
+  if (!pvwsCfg) {
+    for (const svc of Object.values(services)) {
+      if (svc.pvws?.host) { pvwsCfg = svc.pvws; break; }
+    }
+  }
+  pvwsCfg = pvwsCfg || {};
   const pvws = {
     host: pvwsCfg.host || '',
     port: pvwsCfg.port || 80,
