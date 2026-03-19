@@ -1,9 +1,9 @@
 {
-  "name": "react-epik8s-camera-array",
+  "name": "react-epik8s-dashboard",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "EPIK8s Camera Array - Configurable NxM grid of EPICS camera streams with PV control via pvws",
+  "description": "EPIK8s Dashboard - Configuration-driven web application for EPICS control systems with camera arrays, instrumentation control, and beamline overview",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,7 +12,9 @@
   "dependencies": {
     "js-yaml": "^4.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "react-grid-layout": "^1.4.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

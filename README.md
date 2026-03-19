@@ -1,13 +1,70 @@
-# EPIK8s Camera Array
+# EPIK8s Dashboard
 
-A modern React web application that renders a configurable **N×M grid** of EPICS areaDetector camera MJPEG streams, with live PV control via **pvws** (PV Web Socket).
+A modular, configuration-driven React web application that generates dynamic control dashboards from epik8s-style YAML configuration files. Supports multiple views for camera arrays, instrumentation control, and beamline overview with a flexible drag-and-drop layout system.
 
 ## Features
 
-- **Dynamic grid** — configurable rows/cols (default 3×3), adjustable at runtime via the ⚙ panel or URL params
-- **MJPEG streaming** — each tile renders a live `<img>` MJPEG stream from areaDetector IOCs
-- **Camera selection** — dropdown per tile to pick any camera discovered from `values.yaml`
-- **Stream control** — enable/disable button per tile with visual indicator
+- **Multi-view application** — Camera View, Instrumentation View, Beamline Overview with SPA routing
+- **YAML-driven configuration** — loads `values.yaml` at runtime to discover all IOCs and devices
+- **Widget framework** — pluggable widgets (Camera, Motor, BPM, Generic) bound to EPICS PVs via pvws
+- **Drag & drop layout** — react-grid-layout powered dashboards with resize, collapse, detail modals
+- **Layout persistence** — saves user layouts per view/zone to localStorage
+- **Dark/Light theme** — toggle between themes; preference saved
+- **Zone-based beamline view** — groups devices by zone with auto-layout
+- **Search & filter** — filter devices by name, family, type, zone
+- **EPICS PV integration** — subscribe and write via pvws WebSocket
+
+## Quick Start
+
+```bash
+npm install
+npm run dev
+```
+
+Place your `values.yaml` in `public/` or pass `?values=/path/to/values.yaml`.
+
+## Views
+
+| View | Route | Description |
+|------|-------|-------------|
+| Camera Array | `/cameras` | NxM grid of MJPEG camera streams with per-tile controls |
+| Instrumentation | `/instrumentation` | All devices with search/filter and drag-drop layout |
+| Beamline | `/beamline` | Zone-grouped device overview |
+
+## Project Structure
+
+```
+src/
+  App.jsx                           Main router
+  context/AppContext.jsx             Global state (config, devices, pvws client)
+  models/device.js                  Device normalization from YAML
+  services/
+    pvws.js                         PVWS WebSocket client
+    configLoader.js                 YAML parser
+    layoutPersistence.js            Layout save/load (localStorage)
+  hooks/
+    usePv.js                        PV subscription hooks
+    useLayout.js                    Layout state management
+    useTheme.js                     Dark/light theme toggle
+  components/
+    layout/
+      AppShell.jsx                  Navbar and view container
+      DashboardGrid.jsx             react-grid-layout wrapper
+      Widget.jsx                    Base widget container
+    widgets/
+      CameraWidget.jsx              Camera stream + PV controls
+      MotorWidget.jsx               Motor position/move/stop
+      BPMWidget.jsx                 Beam Position Monitor
+      GenericPVWidget.jsx           Generic fallback
+      WidgetRegistry.js             Maps device types to widget components
+    views/
+      CameraView.jsx                NxM camera grid
+      InstrumentationView.jsx       Filterable device dashboard
+      BeamlineView.jsx              Zone-based beamline layout
+    common/
+      PvControls.jsx                PvDisplay, PvInput, PvSlider, StatusIndicator
+      SearchFilter.jsx              Search/filter panel
+```
 - **EPICS PV control** via WebSocket:
   - `${pv_prefix}:Acquire` — Start / Stop
   - `${pv_prefix}:AcquireTime` — Exposure slider
