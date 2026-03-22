@@ -32,6 +32,8 @@ import VacuumWidget from './types/VacuumWidget.jsx';
 import PowerSupplyWidget from './types/PowerSupplyWidget.jsx';
 import ChargeMonitorWidget from './types/ChargeMonitorWidget.jsx';
 import GenericPVWidget from './types/GenericPVWidget.jsx';
+import LLRFWidget from './types/LLRFWidget.jsx';
+import TimingWidget from './types/TimingWidget.jsx';
 
 /* ==========================================
    Universal Base Properties (Phoebus-like)
@@ -382,6 +384,42 @@ const WIDGET_TYPES = {
     properties: props(PV_PREFIX_PROPERTIES, VIEW_MODE_PROPERTY),
     component: GenericPVWidget,
   },
+
+  'llrf': {
+    type: 'llrf',
+    name: 'LLRF (Low-Level RF)',
+    icon: '📡',
+    category: 'Devices',
+    family: 'rf',
+    connectionSuffix: ':app:rf_ctrl',
+    description: 'Libera LLRF — RF control, feedback loops, channel power/phase, conditioning',
+    dataSource: 'pvws',
+    defaultSize: { w: 4, h: 5, minW: 3, minH: 3 },
+    properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
+      { key: 'channel', label: 'Default Channel', type: 'select', default: 'ch1', options: ['ch1','ch2','ch3','ch4','ch5','ch6','ch7','ch8'], group: 'Widget' },
+      { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 6, group: 'Widget' },
+      { key: 'conditioningPrefix', label: 'Conditioning IOC Prefix', type: 'string', default: '', group: 'Widget', placeholder: 'SPARC:RF:CONDITIONING01' },
+    ]),
+    component: LLRFWidget,
+  },
+
+  'timing': {
+    type: 'timing',
+    name: 'Timing (MRF EVG/EVR)',
+    icon: '⏱',
+    category: 'Devices',
+    family: 'timing',
+    connectionSuffix: ':EvtClkPll-Sts',
+    description: 'MRF timing — EVG clock, multiplexed counters, trigger events, EVR delay generators, outputs',
+    dataSource: 'pvws',
+    defaultSize: { w: 5, h: 6, minW: 3, minH: 4 },
+    properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
+      { key: 'evrPrefix', label: 'EVR Device Prefix', type: 'pv', default: '', group: 'Device', placeholder: 'MRF01:EVR' },
+      { key: 'numDelayGens', label: 'Delay Generators', type: 'number', default: 9, min: 1, max: 16, group: 'Widget' },
+      { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 6, group: 'Widget' },
+    ]),
+    component: TimingWidget,
+  },
 };
 
 /* === Public API === */
@@ -434,6 +472,8 @@ const FAMILY_TO_TYPE = {
   bpm: 'bpm',
   vac: 'vacuum',
   mag: 'power-supply',
+  rf: 'llrf',
+  timing: 'timing',
   io: 'generic-pv',
   cool: 'generic-pv',
   generic: 'generic-pv',
