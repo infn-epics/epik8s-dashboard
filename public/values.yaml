@@ -4159,8 +4159,10 @@ applications:
     
       
 
-## Dashboard backend — K8s/ArgoCD API proxy
+## Dashboard UI settings
+## dashboard.title: custom title shown in the navigation bar (default: "EPIK8s")
 dashboard:
+  title: "SPARC — EPIK8s"
   backend:
     enabled: true
     image: "ghcr.io/infn-epics/epik8s-dashboard/k8s-backend:latest"

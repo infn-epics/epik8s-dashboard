@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { usePvwsStatus } from '../../hooks/usePv.js';
 import { useApp } from '../../context/AppContext.jsx';
 import UserMenu from '../common/UserMenu.jsx';
+import HelpPanel from '../common/HelpPanel.jsx';
 import Sidebar from './Sidebar.jsx';
 import ChatConsole from '../consoles/ChatConsole.jsx';
 import SystemConsole from '../consoles/SystemConsole.jsx';
@@ -19,11 +20,18 @@ import SystemConsole from '../consoles/SystemConsole.jsx';
  * Console panels dock at the bottom and can be popped out.
  */
 export default function AppShell({ children, theme, onToggleTheme }) {
-  const { pvwsClient, devices } = useApp();
+  const { pvwsClient, devices, config } = useApp();
   const connected = usePvwsStatus(pvwsClient);
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Configurable title from config.dashboard.title or beamline name
+  const dashboardTitle = config?.dashboard?.title
+    || (config?.beamline ? `${config.beamline.toUpperCase()} — EPIK8s` : 'EPIK8s');
+
+  // Sync browser tab title
+  useEffect(() => { document.title = dashboardTitle; }, [dashboardTitle]);
 
   // Dropdown menus
   const [openGroup, setOpenGroup] = useState(null);
@@ -34,6 +42,21 @@ export default function AppShell({ children, theme, onToggleTheme }) {
   const [systemOpen, setSystemOpen] = useState(false);
   const [chatDetached, setChatDetached] = useState(false);
   const [systemDetached, setSystemDetached] = useState(false);
+
+  // Help panel
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // Keyboard shortcut: F1 or ? toggle help
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F1') { e.preventDefault(); setHelpOpen(h => !h); }
+      if (e.key === '?' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName) && !e.target.isContentEditable) {
+        setHelpOpen(h => !h);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -92,7 +115,7 @@ export default function AppShell({ children, theme, onToggleTheme }) {
       <header className="app-navbar">
         <div className="navbar-brand">
           <span className="navbar-logo">⚛</span>
-          <span className="navbar-title">EPIK8s</span>
+          <span className="navbar-title">{dashboardTitle}</span>
         </div>
 
         <nav className="navbar-nav" ref={dropdownRef}>
@@ -144,6 +167,13 @@ export default function AppShell({ children, theme, onToggleTheme }) {
           >
             🖥
           </button>
+          <button
+            className={`console-toggle-btn ${helpOpen ? 'active' : ''}`}
+            onClick={() => setHelpOpen(h => !h)}
+            title="Help (F1)"
+          >
+            ❓
+          </button>
           <span className="nav-divider" />
           <span className="device-count">{devices.length} devices</span>
           <span className={`conn-badge ${connected ? 'connected' : 'disconnected'}`}>
@@ -183,6 +213,9 @@ export default function AppShell({ children, theme, onToggleTheme }) {
           onClose={() => { setSystemOpen(false); setSystemDetached(false); }}
         />
       )}
+
+      {/* Help panel overlay */}
+      {helpOpen && <HelpPanel onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }
