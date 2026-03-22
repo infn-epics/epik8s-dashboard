@@ -20,7 +20,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { KubeConfig, CoreV1Api, AppsV1Api, CustomObjectsApi } from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api, AppsV1Api, CustomObjectsApi, Metrics } from '@kubernetes/client-node';
 
 // ─── Config ─────────────────────────────────────────────────────────────
 
@@ -290,12 +290,150 @@ app.post('/api/v1/deployments/:name/scale', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+app.post('/api/v1/deployments/:name/restart', async (req, res, next) => {
+  try {
+    const patch = {
+      spec: { template: { metadata: { annotations: {
+        'kubectl.kubernetes.io/restartedAt': new Date().toISOString(),
+      } } } },
+    };
+    await appsApi.patchNamespacedDeployment({
+      name: req.params.name,
+      namespace: NAMESPACE,
+      body: patch,
+    }, undefined, undefined, undefined, undefined, undefined, {
+      headers: { 'Content-Type': 'application/strategic-merge-patch+json' },
+    });
+    res.json({ restarted: req.params.name });
+  } catch (err) { next(err); }
+});
+
+app.delete('/api/v1/deployments/:name', async (req, res, next) => {
+  try {
+    await appsApi.deleteNamespacedDeployment({
+      name: req.params.name,
+      namespace: NAMESPACE,
+    });
+    res.json({ deleted: req.params.name });
+  } catch (err) { next(err); }
+});
+
 // --- StatefulSets -------------------------------------------------
 
 app.get('/api/v1/statefulsets', async (_req, res, next) => {
   try {
     const data = await appsApi.listNamespacedStatefulSet({ namespace: NAMESPACE });
     res.json({ items: data.items });
+  } catch (err) { next(err); }
+});
+
+app.post('/api/v1/statefulsets/:name/scale', async (req, res, next) => {
+  try {
+    const replicas = parseInt(req.body.replicas, 10);
+    if (isNaN(replicas) || replicas < 0 || replicas > 20) {
+      return res.status(400).json({ error: 'replicas must be 0-20' });
+    }
+    const patch = { spec: { replicas } };
+    await appsApi.patchNamespacedStatefulSet({
+      name: req.params.name,
+      namespace: NAMESPACE,
+      body: patch,
+    }, undefined, undefined, undefined, undefined, undefined, {
+      headers: { 'Content-Type': 'application/strategic-merge-patch+json' },
+    });
+    res.json({ scaled: req.params.name, replicas });
+  } catch (err) { next(err); }
+});
+
+app.post('/api/v1/statefulsets/:name/restart', async (req, res, next) => {
+  try {
+    const patch = {
+      spec: { template: { metadata: { annotations: {
+        'kubectl.kubernetes.io/restartedAt': new Date().toISOString(),
+      } } } },
+    };
+    await appsApi.patchNamespacedStatefulSet({
+      name: req.params.name,
+      namespace: NAMESPACE,
+      body: patch,
+    }, undefined, undefined, undefined, undefined, undefined, {
+      headers: { 'Content-Type': 'application/strategic-merge-patch+json' },
+    });
+    res.json({ restarted: req.params.name });
+  } catch (err) { next(err); }
+});
+
+app.delete('/api/v1/statefulsets/:name', async (req, res, next) => {
+  try {
+    await appsApi.deleteNamespacedStatefulSet({
+      name: req.params.name,
+      namespace: NAMESPACE,
+    });
+    res.json({ deleted: req.params.name });
+  } catch (err) { next(err); }
+});
+
+// --- Nodes --------------------------------------------------------
+
+app.get('/api/v1/nodes', async (_req, res, next) => {
+  try {
+    const nodesResp = await coreApi.listNode();
+    // Get metrics if available (requires metrics-server)
+    let metricsMap = {};
+    try {
+      const metricsApi = new Metrics(kc);
+      const nodeMetrics = await metricsApi.getNodeMetrics();
+      for (const m of nodeMetrics.items || []) {
+        metricsMap[m.metadata.name] = m.usage;
+      }
+    } catch { /* metrics-server may not be installed */ }
+
+    // Get pods per node (only our namespace)
+    const podsResp = await coreApi.listNamespacedPod({ namespace: NAMESPACE });
+    const podsByNode = {};
+    for (const pod of podsResp.items) {
+      const node = pod.spec?.nodeName;
+      if (node) {
+        if (!podsByNode[node]) podsByNode[node] = [];
+        podsByNode[node].push(pod.metadata.name);
+      }
+    }
+
+    const nodes = nodesResp.items.map(n => {
+      const name = n.metadata?.name || '';
+      const capacity = n.status?.capacity || {};
+      const allocatable = n.status?.allocatable || {};
+      const conditions = n.status?.conditions || [];
+      const ready = conditions.find(c => c.type === 'Ready');
+      const addresses = n.status?.addresses || [];
+      const internalIP = addresses.find(a => a.type === 'InternalIP')?.address || '';
+      return {
+        name,
+        status: ready?.status === 'True' ? 'Ready' : 'NotReady',
+        roles: Object.keys(n.metadata?.labels || {})
+          .filter(l => l.startsWith('node-role.kubernetes.io/'))
+          .map(l => l.replace('node-role.kubernetes.io/', '')),
+        internalIP,
+        capacity: {
+          cpu: capacity.cpu || '',
+          memory: capacity.memory || '',
+          pods: capacity.pods || '',
+          ephemeralStorage: capacity['ephemeral-storage'] || '',
+        },
+        allocatable: {
+          cpu: allocatable.cpu || '',
+          memory: allocatable.memory || '',
+          pods: allocatable.pods || '',
+        },
+        usage: metricsMap[name] || null,
+        namespacePods: podsByNode[name] || [],
+        labels: n.metadata?.labels || {},
+        createdAt: n.metadata?.creationTimestamp || '',
+        osImage: n.status?.nodeInfo?.osImage || '',
+        kubeletVersion: n.status?.nodeInfo?.kubeletVersion || '',
+      };
+    });
+    res.json({ items: nodes });
   } catch (err) { next(err); }
 });
 

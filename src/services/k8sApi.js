@@ -125,6 +125,45 @@ export function scaleDeployment(name, replicas, token) {
   });
 }
 
+export function restartDeployment(name, token) {
+  return apiFetch(`/api/v1/deployments/${encodeURIComponent(name)}/restart`, token, {
+    method: 'POST',
+  });
+}
+
+export function deleteDeployment(name, token) {
+  return apiFetch(`/api/v1/deployments/${encodeURIComponent(name)}`, token, {
+    method: 'DELETE',
+  });
+}
+
+// ─── StatefulSets ───────────────────────────────────────────────────────
+
+export function scaleStatefulSet(name, replicas, token) {
+  return apiFetch(`/api/v1/statefulsets/${encodeURIComponent(name)}/scale`, token, {
+    method: 'POST',
+    body: JSON.stringify({ replicas }),
+  });
+}
+
+export function restartStatefulSet(name, token) {
+  return apiFetch(`/api/v1/statefulsets/${encodeURIComponent(name)}/restart`, token, {
+    method: 'POST',
+  });
+}
+
+export function deleteStatefulSet(name, token) {
+  return apiFetch(`/api/v1/statefulsets/${encodeURIComponent(name)}`, token, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Nodes ──────────────────────────────────────────────────────────────
+
+export function listNodes(token) {
+  return apiFetch('/api/v1/nodes', token);
+}
+
 // ─── Namespace info ─────────────────────────────────────────────────────
 
 export function getNamespaceInfo(token) {

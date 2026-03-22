@@ -2,7 +2,7 @@
  * K8sView — Manage ArgoCD applications and Kubernetes resources
  * for the beamline namespace.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import {
@@ -10,7 +10,9 @@ import {
   listApplications, syncApplication, restartApplication,
   listPods, getPodLogs, deletePod,
   listServices, listConfigMaps, listDeployments, listStatefulSets,
-  scaleDeployment,
+  scaleDeployment, restartDeployment, deleteDeployment,
+  scaleStatefulSet, restartStatefulSet, deleteStatefulSet,
+  listNodes,
 } from '../../services/k8sApi.js';
 
 const TABS = [
@@ -20,6 +22,7 @@ const TABS = [
   { key: 'deployments', label: '🚀 Deployments', icon: '🚀' },
   { key: 'configmaps', label: '📋 ConfigMaps', icon: '📋' },
   { key: 'statefulsets', label: '💾 StatefulSets', icon: '💾' },
+  { key: 'nodes', label: '🖥 Nodes', icon: '🖥' },
 ];
 
 export default function K8sView() {
@@ -32,6 +35,7 @@ export default function K8sView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
+  const [search, setSearch] = useState('');
 
   // Pod logs
   const [logsOpen, setLogsOpen] = useState(null); // pod name
@@ -40,7 +44,7 @@ export default function K8sView() {
   const logsRef = useRef(null);
 
   // Scale dialog
-  const [scaleTarget, setScaleTarget] = useState(null);
+  const [scaleTarget, setScaleTarget] = useState(null); // { name, kind }
   const [scaleReplicas, setScaleReplicas] = useState(1);
 
   /* ── Init backend URL ───────────────────── */
@@ -69,6 +73,7 @@ export default function K8sView() {
         case 'deployments': result = await listDeployments(token); break;
         case 'configmaps': result = await listConfigMaps(token); break;
         case 'statefulsets': result = await listStatefulSets(token); break;
+        case 'nodes': result = await listNodes(token); break;
         default: return;
       }
       setData(result);
@@ -117,11 +122,48 @@ export default function K8sView() {
   const handleScale = async () => {
     if (!scaleTarget) return;
     try {
-      await scaleDeployment(scaleTarget, scaleReplicas, token);
-      flash(`Scaled ${scaleTarget} to ${scaleReplicas}`);
+      const scaleFn = scaleTarget.kind === 'statefulset' ? scaleStatefulSet : scaleDeployment;
+      await scaleFn(scaleTarget.name, scaleReplicas, token);
+      flash(`Scaled ${scaleTarget.name} to ${scaleReplicas}`);
       setScaleTarget(null);
       fetchTab();
     } catch (err) { flash(`Scale failed: ${err.message}`); }
+  };
+
+  const handleRestartDeployment = async (name) => {
+    if (!window.confirm(`Restart deployment ${name}?`)) return;
+    try {
+      await restartDeployment(name, token);
+      flash(`Restarted deployment ${name}`);
+      fetchTab();
+    } catch (err) { flash(`Restart failed: ${err.message}`); }
+  };
+
+  const handleDeleteDeployment = async (name) => {
+    if (!window.confirm(`Delete deployment ${name}? This is destructive.`)) return;
+    try {
+      await deleteDeployment(name, token);
+      flash(`Deleted deployment ${name}`);
+      fetchTab();
+    } catch (err) { flash(`Delete failed: ${err.message}`); }
+  };
+
+  const handleRestartStatefulSet = async (name) => {
+    if (!window.confirm(`Restart statefulset ${name}?`)) return;
+    try {
+      await restartStatefulSet(name, token);
+      flash(`Restarted statefulset ${name}`);
+      fetchTab();
+    } catch (err) { flash(`Restart failed: ${err.message}`); }
+  };
+
+  const handleDeleteStatefulSet = async (name) => {
+    if (!window.confirm(`Delete statefulset ${name}? This is destructive.`)) return;
+    try {
+      await deleteStatefulSet(name, token);
+      flash(`Deleted statefulset ${name}`);
+      fetchTab();
+    } catch (err) { flash(`Delete failed: ${err.message}`); }
   };
 
   const handleLogs = async (podName) => {
@@ -147,9 +189,9 @@ export default function K8sView() {
 
   const healthBadge = (status) => {
     const s = (status || '').toLowerCase();
-    if (s === 'healthy' || s === 'synced' || s === 'running') return 'k8s-badge--ok';
+    if (s === 'healthy' || s === 'synced' || s === 'running' || s === 'ready' || s === 'true') return 'k8s-badge--ok';
     if (s === 'degraded' || s === 'outofsync' || s === 'pending') return 'k8s-badge--warn';
-    if (s === 'missing' || s === 'unknown' || s === 'failed' || s === 'error') return 'k8s-badge--err';
+    if (s === 'missing' || s === 'unknown' || s === 'failed' || s === 'error' || s === 'notready') return 'k8s-badge--err';
     return '';
   };
 
@@ -184,10 +226,24 @@ export default function K8sView() {
         {TABS.map(t => (
           <button key={t.key}
             className={`k8s-tab ${tab === t.key ? 'active' : ''}`}
-            onClick={() => setTab(t.key)}>
+            onClick={() => { setTab(t.key); setSearch(''); }}>
             {t.label}
           </button>
         ))}
+      </div>
+
+      {/* Search bar */}
+      <div className="k8s-search-bar">
+        <input
+          className="k8s-search-input"
+          type="text"
+          placeholder="Search by name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button className="k8s-search-clear" onClick={() => setSearch('')}>✕</button>
+        )}
       </div>
 
       {actionMsg && <div className="bl-editor-flash bl-editor-flash--ok">{actionMsg}</div>}
@@ -198,17 +254,27 @@ export default function K8sView() {
         {loading ? (
           <div className="tickets-loading">⟳ Loading…</div>
         ) : tab === 'apps' ? (
-          <AppsTable items={items} onSync={handleSync} onRestart={handleRestart} healthBadge={healthBadge} />
+          <AppsTable items={items} search={search} onSync={handleSync} onRestart={handleRestart} healthBadge={healthBadge} />
         ) : tab === 'pods' ? (
-          <PodsTable items={items} onLogs={handleLogs} onDelete={handleDeletePod} healthBadge={healthBadge} />
+          <PodsTable items={items} search={search} onLogs={handleLogs} onDelete={handleDeletePod} healthBadge={healthBadge} />
         ) : tab === 'services' ? (
-          <ResourceTable items={items} columns={['name', 'type', 'clusterIP', 'ports']} />
+          <ServicesTable items={items} search={search} />
         ) : tab === 'deployments' ? (
-          <DeploymentsTable items={items} onScale={(name, cur) => { setScaleTarget(name); setScaleReplicas(cur || 1); }} healthBadge={healthBadge} />
+          <DeploymentsTable items={items} search={search}
+            onScale={(name, cur) => { setScaleTarget({ name, kind: 'deployment' }); setScaleReplicas(cur || 1); }}
+            onRestart={handleRestartDeployment}
+            onDelete={handleDeleteDeployment}
+            healthBadge={healthBadge} />
         ) : tab === 'configmaps' ? (
-          <ResourceTable items={items} columns={['name', 'data']} />
+          <ConfigMapsTable items={items} search={search} />
         ) : tab === 'statefulsets' ? (
-          <ResourceTable items={items} columns={['name', 'replicas', 'ready']} />
+          <StatefulSetsTable items={items} search={search}
+            onScale={(name, cur) => { setScaleTarget({ name, kind: 'statefulset' }); setScaleReplicas(cur || 1); }}
+            onRestart={handleRestartStatefulSet}
+            onDelete={handleDeleteStatefulSet}
+            healthBadge={healthBadge} />
+        ) : tab === 'nodes' ? (
+          <NodesTable items={items} search={search} healthBadge={healthBadge} />
         ) : null}
       </div>
 
@@ -230,7 +296,7 @@ export default function K8sView() {
         <div className="widget-modal-overlay" onClick={() => setScaleTarget(null)}>
           <div className="widget-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
             <div className="widget-modal-header">
-              <span className="widget-title">Scale {scaleTarget}</span>
+              <span className="widget-title">Scale {scaleTarget.name}</span>
               <button className="widget-btn" onClick={() => setScaleTarget(null)}>✕</button>
             </div>
             <div className="widget-modal-body">
@@ -251,21 +317,100 @@ export default function K8sView() {
   );
 }
 
+/* ── Sortable table hook ─────────────────────────────────────────────── */
+
+function useSortable(defaultCol = 'name', defaultDir = 'asc') {
+  const [sortCol, setSortCol] = useState(defaultCol);
+  const [sortDir, setSortDir] = useState(defaultDir);
+  const toggle = (col) => {
+    if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+  return { sortCol, sortDir, toggle };
+}
+
+function sortItems(items, col, dir, getter) {
+  return [...items].sort((a, b) => {
+    let va = getter(a, col);
+    let vb = getter(b, col);
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+function SortHeader({ label, col, sortCol, sortDir, onSort }) {
+  const arrow = col === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  return (
+    <th className="k8s-sortable-th" onClick={() => onSort(col)}>
+      {label}{arrow}
+    </th>
+  );
+}
+
+function filterBySearch(items, search, getName) {
+  if (!search) return items;
+  const q = search.toLowerCase();
+  return items.filter(item => (getName(item) || '').toLowerCase().includes(q));
+}
+
+/* ── Helper: human-readable resource values ─────────────────────────── */
+
+function humanMem(val) {
+  if (!val) return '—';
+  if (typeof val === 'number') return `${Math.round(val / 1024 / 1024)} Mi`;
+  const s = String(val);
+  if (s.endsWith('Ki')) return `${Math.round(parseInt(s) / 1024)} Mi`;
+  if (s.endsWith('Mi')) return s;
+  if (s.endsWith('Gi')) return s;
+  const n = parseInt(s);
+  if (!isNaN(n)) return `${Math.round(n / 1024 / 1024)} Mi`;
+  return s;
+}
+
+function humanCpu(val) {
+  if (!val) return '—';
+  const s = String(val);
+  if (s.endsWith('n')) return `${Math.round(parseInt(s) / 1e6)}m`;
+  if (s.endsWith('m')) return s;
+  const n = parseFloat(s);
+  if (!isNaN(n)) return n < 1 ? `${Math.round(n * 1000)}m` : `${n}`;
+  return s;
+}
+
 /* ── Sub-tables ─────────────────────────────────────────────────────────── */
 
-function AppsTable({ items, onSync, onRestart, healthBadge }) {
-  if (!items.length) return <div className="tickets-empty-list">No applications found.</div>;
+function AppsTable({ items, search, onSync, onRestart, healthBadge }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getName = (app) => app.metadata?.name || app.name || '';
+  const getter = (app, col) => {
+    if (col === 'name') return getName(app);
+    if (col === 'health') return app.status?.health?.status || app.health || '';
+    if (col === 'sync') return app.status?.sync?.status || app.sync || '';
+    if (col === 'repo') return app.spec?.source?.repoURL || app.repo || '';
+    return '';
+  };
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No applications found.</div>;
   return (
     <table className="k8s-table">
       <thead>
-        <tr><th>Name</th><th>Health</th><th>Sync</th><th>Repo</th><th>Actions</th></tr>
+        <tr>
+          <SortHeader label="Name" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Health" col="health" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Sync" col="sync" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Repo" col="repo" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
-        {items.map(app => {
-          const name = app.metadata?.name || app.name || '?';
-          const health = app.status?.health?.status || app.health || '';
-          const sync = app.status?.sync?.status || app.sync || '';
-          const repo = app.spec?.source?.repoURL || app.repo || '';
+        {filtered.map(app => {
+          const name = getName(app);
+          const health = getter(app, 'health');
+          const sync = getter(app, 'sync');
+          const repo = getter(app, 'repo');
           return (
             <tr key={name}>
               <td className="k8s-cell-name">{name}</td>
@@ -284,24 +429,58 @@ function AppsTable({ items, onSync, onRestart, healthBadge }) {
   );
 }
 
-function PodsTable({ items, onLogs, onDelete, healthBadge }) {
-  if (!items.length) return <div className="tickets-empty-list">No pods found.</div>;
+function PodsTable({ items, search, onLogs, onDelete, healthBadge }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getName = (pod) => pod.metadata?.name || pod.name || '';
+  const getter = (pod, col) => {
+    if (col === 'name') return getName(pod);
+    if (col === 'status') return pod.status?.phase || pod.phase || '';
+    if (col === 'restarts') return pod.status?.containerStatuses?.[0]?.restartCount ?? 0;
+    if (col === 'node') return pod.spec?.nodeName || '';
+    if (col === 'cpu') {
+      const req = pod.spec?.containers?.[0]?.resources?.requests?.cpu || '';
+      return req;
+    }
+    if (col === 'memory') {
+      const req = pod.spec?.containers?.[0]?.resources?.requests?.memory || '';
+      return req;
+    }
+    if (col === 'age') return pod.metadata?.creationTimestamp || '';
+    return '';
+  };
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No pods found.</div>;
   return (
     <table className="k8s-table">
       <thead>
-        <tr><th>Pod</th><th>Status</th><th>Restarts</th><th>Age</th><th>Actions</th></tr>
+        <tr>
+          <SortHeader label="Pod" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Status" col="status" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Restarts" col="restarts" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Node" col="node" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="CPU Req" col="cpu" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Mem Req" col="memory" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Age" col="age" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
-        {items.map(pod => {
-          const name = pod.metadata?.name || pod.name || '?';
-          const phase = pod.status?.phase || pod.phase || '';
-          const restarts = pod.status?.containerStatuses?.[0]?.restartCount ?? pod.restarts ?? '';
-          const started = pod.metadata?.creationTimestamp || pod.createdAt || '';
+        {filtered.map(pod => {
+          const name = getName(pod);
+          const phase = getter(pod, 'status');
+          const restarts = getter(pod, 'restarts');
+          const node = getter(pod, 'node');
+          const cpuReq = getter(pod, 'cpu');
+          const memReq = getter(pod, 'memory');
+          const started = getter(pod, 'age');
           return (
             <tr key={name}>
               <td className="k8s-cell-name">{name}</td>
               <td><span className={`k8s-badge ${healthBadge(phase)}`}>{phase}</span></td>
               <td>{restarts}</td>
+              <td className="k8s-cell-node">{node}</td>
+              <td>{humanCpu(cpuReq)}</td>
+              <td>{humanMem(memReq)}</td>
               <td>{started ? new Date(started).toLocaleString() : ''}</td>
               <td className="k8s-cell-actions">
                 <button className="bl-btn bl-btn--xs" onClick={() => onLogs(name)} title="View Logs">📜</button>
@@ -315,27 +494,49 @@ function PodsTable({ items, onLogs, onDelete, healthBadge }) {
   );
 }
 
-function DeploymentsTable({ items, onScale, healthBadge }) {
-  if (!items.length) return <div className="tickets-empty-list">No deployments found.</div>;
+function DeploymentsTable({ items, search, onScale, onRestart, onDelete, healthBadge }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getName = (dep) => dep.metadata?.name || dep.name || '';
+  const getter = (dep, col) => {
+    if (col === 'name') return getName(dep);
+    if (col === 'replicas') return dep.status?.replicas ?? dep.spec?.replicas ?? 0;
+    if (col === 'ready') return dep.status?.readyReplicas ?? 0;
+    if (col === 'updated') return dep.status?.updatedReplicas ?? 0;
+    if (col === 'image') return dep.spec?.template?.spec?.containers?.[0]?.image || '';
+    return '';
+  };
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No deployments found.</div>;
   return (
     <table className="k8s-table">
       <thead>
-        <tr><th>Deployment</th><th>Replicas</th><th>Ready</th><th>Updated</th><th>Actions</th></tr>
+        <tr>
+          <SortHeader label="Deployment" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Replicas" col="replicas" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Ready" col="ready" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Updated" col="updated" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Image" col="image" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
-        {items.map(dep => {
-          const name = dep.metadata?.name || dep.name || '?';
-          const replicas = dep.status?.replicas ?? dep.spec?.replicas ?? dep.replicas ?? '';
-          const ready = dep.status?.readyReplicas ?? dep.ready ?? '';
-          const updated = dep.status?.updatedReplicas ?? '';
+        {filtered.map(dep => {
+          const name = getName(dep);
+          const replicas = getter(dep, 'replicas');
+          const ready = getter(dep, 'ready');
+          const updated = getter(dep, 'updated');
+          const image = getter(dep, 'image');
           return (
             <tr key={name}>
               <td className="k8s-cell-name">{name}</td>
               <td>{replicas}</td>
               <td><span className={`k8s-badge ${ready === replicas ? 'k8s-badge--ok' : 'k8s-badge--warn'}`}>{ready}/{replicas}</span></td>
               <td>{updated}</td>
+              <td className="k8s-cell-url">{image}</td>
               <td className="k8s-cell-actions">
                 <button className="bl-btn bl-btn--xs" onClick={() => onScale(name, replicas)} title="Scale">⚖</button>
+                <button className="bl-btn bl-btn--xs" onClick={() => onRestart(name)} title="Restart">♻</button>
+                <button className="bl-btn bl-btn--xs bl-btn--danger" onClick={() => onDelete(name)} title="Delete">🗑</button>
               </td>
             </tr>
           );
@@ -345,35 +546,178 @@ function DeploymentsTable({ items, onScale, healthBadge }) {
   );
 }
 
-function ResourceTable({ items, columns }) {
-  if (!items.length) return <div className="tickets-empty-list">No resources found.</div>;
-  const getVal = (item, col) => {
-    // Try metadata.name first, then direct
-    if (col === 'name') return item.metadata?.name || item.name || '';
-    if (col === 'type') return item.spec?.type || item.type || '';
-    if (col === 'clusterIP') return item.spec?.clusterIP || item.clusterIP || '';
-    if (col === 'ports') {
-      const ports = item.spec?.ports || item.ports || [];
-      return ports.map(p => `${p.port}${p.targetPort ? ':' + p.targetPort : ''}/${p.protocol || 'TCP'}`).join(', ');
-    }
-    if (col === 'data') {
-      const keys = Object.keys(item.data || item.metadata?.data || {});
-      return keys.length ? keys.join(', ') : '—';
-    }
-    if (col === 'replicas') return item.status?.replicas ?? item.spec?.replicas ?? '';
-    if (col === 'ready') return item.status?.readyReplicas ?? '';
-    return item[col] ?? '';
+function StatefulSetsTable({ items, search, onScale, onRestart, onDelete, healthBadge }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getName = (ss) => ss.metadata?.name || ss.name || '';
+  const getter = (ss, col) => {
+    if (col === 'name') return getName(ss);
+    if (col === 'replicas') return ss.status?.replicas ?? ss.spec?.replicas ?? 0;
+    if (col === 'ready') return ss.status?.readyReplicas ?? 0;
+    if (col === 'image') return ss.spec?.template?.spec?.containers?.[0]?.image || '';
+    return '';
   };
-
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No statefulsets found.</div>;
   return (
     <table className="k8s-table">
       <thead>
-        <tr>{columns.map(c => <th key={c}>{c}</th>)}</tr>
+        <tr>
+          <SortHeader label="StatefulSet" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Replicas" col="replicas" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Ready" col="ready" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Image" col="image" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
-        {items.map((item, i) => (
-          <tr key={getVal(item, 'name') || i}>
-            {columns.map(c => <td key={c}>{getVal(item, c)}</td>)}
+        {filtered.map(ss => {
+          const name = getName(ss);
+          const replicas = getter(ss, 'replicas');
+          const ready = getter(ss, 'ready');
+          const image = getter(ss, 'image');
+          return (
+            <tr key={name}>
+              <td className="k8s-cell-name">{name}</td>
+              <td>{replicas}</td>
+              <td><span className={`k8s-badge ${ready === replicas ? 'k8s-badge--ok' : 'k8s-badge--warn'}`}>{ready}/{replicas}</span></td>
+              <td className="k8s-cell-url">{image}</td>
+              <td className="k8s-cell-actions">
+                <button className="bl-btn bl-btn--xs" onClick={() => onScale(name, replicas)} title="Scale">⚖</button>
+                <button className="bl-btn bl-btn--xs" onClick={() => onRestart(name)} title="Restart">♻</button>
+                <button className="bl-btn bl-btn--xs bl-btn--danger" onClick={() => onDelete(name)} title="Delete">🗑</button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function ServicesTable({ items, search }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getName = (svc) => svc.metadata?.name || svc.name || '';
+  const getter = (svc, col) => {
+    if (col === 'name') return getName(svc);
+    if (col === 'type') return svc.spec?.type || '';
+    if (col === 'clusterIP') return svc.spec?.clusterIP || '';
+    if (col === 'ports') {
+      const ports = svc.spec?.ports || [];
+      return ports.map(p => `${p.port}${p.targetPort ? ':' + p.targetPort : ''}/${p.protocol || 'TCP'}`).join(', ');
+    }
+    return '';
+  };
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No services found.</div>;
+  return (
+    <table className="k8s-table">
+      <thead>
+        <tr>
+          <SortHeader label="Name" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Type" col="type" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Cluster IP" col="clusterIP" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Ports" col="ports" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+        </tr>
+      </thead>
+      <tbody>
+        {filtered.map(svc => (
+          <tr key={getName(svc)}>
+            <td className="k8s-cell-name">{getName(svc)}</td>
+            <td>{getter(svc, 'type')}</td>
+            <td>{getter(svc, 'clusterIP')}</td>
+            <td>{getter(svc, 'ports')}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function ConfigMapsTable({ items, search }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getName = (cm) => cm.metadata?.name || cm.name || '';
+  const getter = (cm, col) => {
+    if (col === 'name') return getName(cm);
+    if (col === 'keys') {
+      const keys = Object.keys(cm.data || {});
+      return keys.join(', ') || '—';
+    }
+    if (col === 'age') return cm.metadata?.creationTimestamp || '';
+    return '';
+  };
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No configmaps found.</div>;
+  return (
+    <table className="k8s-table">
+      <thead>
+        <tr>
+          <SortHeader label="Name" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Keys" col="keys" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Age" col="age" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+        </tr>
+      </thead>
+      <tbody>
+        {filtered.map(cm => (
+          <tr key={getName(cm)}>
+            <td className="k8s-cell-name">{getName(cm)}</td>
+            <td>{getter(cm, 'keys')}</td>
+            <td>{getter(cm, 'age') ? new Date(getter(cm, 'age')).toLocaleString() : ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function NodesTable({ items, search, healthBadge }) {
+  const { sortCol, sortDir, toggle } = useSortable('name');
+  const getter = (n, col) => {
+    if (col === 'name') return n.name || '';
+    if (col === 'status') return n.status || '';
+    if (col === 'roles') return (n.roles || []).join(', ');
+    if (col === 'ip') return n.internalIP || '';
+    if (col === 'cpuCap') return n.capacity?.cpu || '';
+    if (col === 'memCap') return n.capacity?.memory || '';
+    if (col === 'cpuUsage') return n.usage?.cpu || '';
+    if (col === 'memUsage') return n.usage?.memory || '';
+    if (col === 'pods') return n.namespacePods?.length ?? 0;
+    if (col === 'version') return n.kubeletVersion || '';
+    return '';
+  };
+  const getName = (n) => n.name || '';
+  const filtered = sortItems(filterBySearch(items, search, getName), sortCol, sortDir, getter);
+  if (!filtered.length) return <div className="tickets-empty-list">No nodes found.</div>;
+  return (
+    <table className="k8s-table">
+      <thead>
+        <tr>
+          <SortHeader label="Node" col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Status" col="status" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Roles" col="roles" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="IP" col="ip" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="CPU Cap" col="cpuCap" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Mem Cap" col="memCap" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="CPU Used" col="cpuUsage" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Mem Used" col="memUsage" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="NS Pods" col="pods" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+          <SortHeader label="Version" col="version" sortCol={sortCol} sortDir={sortDir} onSort={toggle} />
+        </tr>
+      </thead>
+      <tbody>
+        {filtered.map(n => (
+          <tr key={n.name}>
+            <td className="k8s-cell-name">{n.name}</td>
+            <td><span className={`k8s-badge ${healthBadge(n.status)}`}>{n.status}</span></td>
+            <td>{(n.roles || []).join(', ') || '—'}</td>
+            <td>{n.internalIP}</td>
+            <td>{n.capacity?.cpu || '—'}</td>
+            <td>{humanMem(n.capacity?.memory)}</td>
+            <td>{humanCpu(n.usage?.cpu)}</td>
+            <td>{humanMem(n.usage?.memory)}</td>
+            <td title={(n.namespacePods || []).join('\n')}>
+              {n.namespacePods?.length ?? 0}
+            </td>
+            <td>{n.kubeletVersion}</td>
           </tr>
         ))}
       </tbody>

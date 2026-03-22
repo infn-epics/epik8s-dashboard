@@ -5616,6 +5616,43 @@ body,
   min-height: 200px;
 }
 
+/* K8s search bar */
+.k8s-search-bar {
+  position: relative;
+  margin-bottom: 12px;
+  max-width: 350px;
+}
+.k8s-search-input {
+  width: 100%;
+  padding: 7px 32px 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #1e1e1e;
+  color: #ddd;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.k8s-search-input:focus {
+  border-color: #6366f1;
+}
+.k8s-search-input::placeholder {
+  color: #666;
+}
+.k8s-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+}
+.k8s-search-clear:hover { color: #ddd; }
+
 /* K8s table */
 .k8s-table {
   width: 100%;
@@ -5631,6 +5668,23 @@ body,
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+.k8s-sortable-th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #444;
+  color: #888;
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.k8s-sortable-th:hover {
+  color: #ddd;
 }
 .k8s-table td {
   padding: 8px 10px;
@@ -5659,6 +5713,14 @@ body,
 .k8s-cell-actions {
   display: flex;
   gap: 4px;
+}
+.k8s-cell-node {
+  font-size: 0.82rem;
+  color: #aaa;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* K8s badges */
