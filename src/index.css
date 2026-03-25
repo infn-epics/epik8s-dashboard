@@ -6764,6 +6764,32 @@ body,
 .bc-error { background: rgba(220,53,69,.15); color: #f87171; padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; }
 .bc-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #64748b; font-size: 0.92rem; }
 
+/* Controller service status */
+.bc-service-panel { background: var(--color-surface, #1e293b); border: 1px solid var(--color-border, #334155); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.bc-service-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bc-service-header h4 { margin: 0; font-size: 0.95rem; color: #e2e8f0; }
+.bc-service-actions { display: flex; align-items: center; gap: 8px; }
+.bc-service-health { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: .06em; }
+.bc-service-health.ok { color: #22c55e; background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.35); }
+.bc-service-health.down { color: #f87171; background: rgba(220,53,69,.15); border: 1px solid rgba(220,53,69,.35); }
+.bc-service-url { font-family: monospace; font-size: 0.78rem; color: #60a5fa; background: rgba(96,165,250,.08); border: 1px dashed rgba(96,165,250,.35); border-radius: 6px; padding: 6px 8px; }
+.bc-service-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.bc-service-stat { background: rgba(0,0,0,.18); border: 1px solid var(--color-border, #334155); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+.bc-service-stat span { font-size: 0.74rem; color: #94a3b8; }
+.bc-service-stat strong { font-size: 0.95rem; color: #e2e8f0; }
+.bc-service-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+.bc-service-list { background: rgba(0,0,0,.15); border: 1px solid var(--color-border, #334155); border-radius: 6px; padding: 8px; }
+.bc-service-list h5 { margin: 0 0 8px 0; font-size: 0.82rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: .04em; }
+.bc-service-list ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.bc-service-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; font-size: 0.8rem; }
+.bc-service-list .name { font-family: monospace; color: #e2e8f0; }
+.bc-service-list .status { font-size: 0.68rem; font-weight: 700; border-radius: 999px; padding: 2px 7px; }
+.bc-service-list .status.run { color: #22c55e; background: rgba(34,197,94,.15); }
+.bc-service-list .status.idle { color: #94a3b8; background: rgba(148,163,184,.15); }
+.bc-service-list .meta { color: #64748b; font-size: 0.74rem; }
+.bc-service-empty { color: #64748b; font-size: 0.8rem; }
+.bc-service-updated { color: #64748b; font-size: 0.74rem; text-align: right; }
+
 /* Config panel */
 .bc-config-panel { background: var(--color-surface, #1e293b); border: 1px solid var(--color-border, #334155); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .bc-config-panel h4 { margin: 0; font-size: 0.95rem; color: #e2e8f0; }
