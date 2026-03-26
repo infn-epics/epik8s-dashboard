@@ -1,6 +1,130 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePv } from '../../../hooks/usePv.js';
 import { PvDisplay, PvInput } from '../../../components/common/PvControls.jsx';
+
+function resolveEnumChoices(pvMsg) {
+  if (!pvMsg) return [];
+  const c = pvMsg.choices || pvMsg.enumStrings || pvMsg.enum_strs || pvMsg.labels;
+  return Array.isArray(c) ? c.map((v) => String(v)) : [];
+}
+
+function PoiControls({ pvPrefix, client }) {
+  const [openMenu, setOpenMenu] = useState(false);
+  const poiSelPv = usePv(client, pvPrefix ? `${pvPrefix}:POI_SEL` : null);
+  const poiCurrPv = usePv(client, pvPrefix ? `${pvPrefix}:POI_CURR` : null);
+  const liveChoices = resolveEnumChoices(poiSelPv);
+  const [cachedChoices, setCachedChoices] = useState([]);
+  useEffect(() => {
+    if (liveChoices.length) setCachedChoices(liveChoices);
+  }, [liveChoices]);
+  const choices = liveChoices.length ? liveChoices : cachedChoices;
+  const poiCurr = (poiCurrPv?.text ?? poiCurrPv?.value ?? '').toString().trim();
+  const rawSel = poiSelPv?.value;
+  const selIdx = (() => {
+    if (typeof rawSel === 'number' && Number.isInteger(rawSel)) return rawSel;
+    if (typeof rawSel === 'string') {
+      const parsed = parseInt(rawSel, 10);
+      if (Number.isInteger(parsed)) return parsed;
+      const byLabel = choices.findIndex((c) => c === rawSel);
+      if (byLabel >= 0) return byLabel;
+    }
+    return null;
+  })();
+  const hasPoiSel = choices.length > 0 || Number.isInteger(selIdx);
+  const hasPoiCurr = poiCurr.length > 0;
+
+  if (!hasPoiSel && !hasPoiCurr) return null;
+
+  const currentIdx = Number.isInteger(selIdx) ? selIdx : 0;
+  const putSel = (idx) => {
+    if (!client?.put || !pvPrefix) return;
+    client.put(`${pvPrefix}:POI_SEL`, idx);
+  };
+
+  const goPoi = () => {
+    if (!client?.put || !pvPrefix) return;
+    client.put(`${pvPrefix}:POI_GO`, 1);
+  };
+
+  return (
+    <>
+      <div className="motor-poi-panel">
+        <span className="motor-poi-title">POI</span>
+        {hasPoiSel && (
+          <select
+            className="pv-input motor-poi-select"
+            value={currentIdx}
+            onChange={(e) => putSel(parseInt(e.target.value, 10))}
+            title={pvPrefix ? `${pvPrefix}:POI_SEL` : 'POI_SEL'}
+          >
+            {(choices.length ? choices : [String(currentIdx)]).map((label, idx) => (
+              <option key={`${idx}-${label}`} value={idx}>{label}</option>
+            ))}
+          </select>
+        )}
+        {hasPoiSel && (
+          <button
+            type="button"
+            className="widget-action-btn"
+            onClick={goPoi}
+            title={pvPrefix ? `${pvPrefix}:POI_GO` : 'POI_GO'}
+          >
+            Go
+          </button>
+        )}
+        {hasPoiSel && (
+          <button
+            type="button"
+            className="widget-action-btn"
+            onClick={() => {
+              goPoi();
+              setOpenMenu(true);
+            }}
+            title="Open POI panel"
+          >
+            Poi..
+          </button>
+        )}
+        {hasPoiCurr && <span className="motor-poi-curr">{poiCurr}</span>}
+      </div>
+
+      {openMenu && (
+        <div className="bpm-wave-modal-backdrop" onClick={() => setOpenMenu(false)}>
+          <div className="bpm-wave-modal motor-poi-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="bpm-wave-modal-head">
+              <strong>POI Menu</strong>
+              <button type="button" className="bpm-wave-modal-close" onClick={() => setOpenMenu(false)}>Close</button>
+            </div>
+            <div className="motor-poi-modal-body">
+              {hasPoiSel && (
+                <>
+                  <label className="pv-label">Selected POI</label>
+                  <select
+                    className="pv-input"
+                    value={currentIdx}
+                    onChange={(e) => putSel(parseInt(e.target.value, 10))}
+                    title={pvPrefix ? `${pvPrefix}:POI_SEL` : 'POI_SEL'}
+                  >
+                    {(choices.length ? choices : [String(currentIdx)]).map((label, idx) => (
+                      <option key={`modal-${idx}-${label}`} value={idx}>{label}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="widget-action-btn accent" onClick={goPoi}>Go Selected</button>
+                </>
+              )}
+              {hasPoiCurr && (
+                <>
+                  <label className="pv-label">Current POI</label>
+                  <div className="motor-poi-curr">{poiCurr}</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 /**
  * MotorWidget — Motor control panel with essential/detail views.
@@ -70,6 +194,8 @@ function MotorEssential({ pvPrefix, client, precision, numberFormat, showUnits }
         <button className="widget-action-btn" onClick={() => put('.HOMF', 1)} title="Home Forward">🏠 Home</button>
         <button className="widget-action-btn motor-stop-btn" onClick={() => put('.STOP', 1)}>⏹ STOP</button>
       </div>
+
+      <PoiControls pvPrefix={pvPrefix} client={client} />
     </div>
   );
 }
@@ -185,6 +311,9 @@ function DriveTab({ pvPrefix, client, precision, numberFormat, showUnits, put })
           <button className="widget-action-btn motor-stop-btn" onClick={() => put('.STOP', 1)}>⏹ STOP</button>
         </div>
       </div>
+
+      <div className="motor-section-title">POI</div>
+      <PoiControls pvPrefix={pvPrefix} client={client} />
     </div>
   );
 }

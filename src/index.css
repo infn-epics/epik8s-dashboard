@@ -1580,6 +1580,44 @@ body,
   border-color: var(--accent);
 }
 
+.motor-poi-panel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.motor-poi-title {
+  font-size: 0.78em;
+  color: #9aa3b2;
+  min-width: 26px;
+}
+
+.motor-poi-select {
+  min-width: 120px;
+  max-width: 220px;
+  height: 26px;
+}
+
+.motor-poi-curr {
+  font-size: 0.8em;
+  color: #d6dde8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.motor-poi-modal {
+  width: min(520px, 94%);
+}
+
+.motor-poi-modal-body {
+  display: grid;
+  gap: 8px;
+}
+
 /* ===== BPM Widget ===== */
 .bpm-widget-body {
   display: flex;
