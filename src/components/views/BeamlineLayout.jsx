@@ -40,7 +40,7 @@ import '@xyflow/react/dist/style.css';
 import { useApp } from '../../context/AppContext.jsx';
 import { getGlyph, GLYPH_TYPES, STATUS_COLORS } from '../glyphs/DeviceGlyphs.jsx';
 import { usePv } from '../../hooks/usePv.js';
-import { familyToWidgetType, getWidgetComponent } from '../../widgets/registry.js';
+import { deviceToWidgetType, getWidgetComponent } from '../../widgets/registry.js';
 import { deviceToWidgetConfig } from '../../models/dashboard.js';
 import WidgetFrame from '../../widgets/WidgetFrame.jsx';
 
@@ -1835,8 +1835,8 @@ export default function BeamlineLayout() {
 // ─── Device Detail Widget ───────────────────────────────────────────────
 
 function DeviceDetail({ device, client }) {
-  const widgetType = familyToWidgetType(device.family);
-  const Component = getWidgetComponent(widgetType);
+  const widgetType = deviceToWidgetType(device);
+  const Component = getWidgetComponent(widgetType, device);
   const config = {
     ...deviceToWidgetConfig(device),
     viewMode: 'detail',

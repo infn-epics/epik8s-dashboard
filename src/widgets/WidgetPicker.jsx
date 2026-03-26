@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { getWidgetTypesByCategory, getDefaultConfig, CATEGORY_ORDER, familyToWidgetType } from './registry.js';
+import { getWidgetTypesByCategory, getDefaultConfig, CATEGORY_ORDER, deviceToWidgetType } from './registry.js';
 import { deviceToWidgetConfig } from '../models/dashboard.js';
 
 /**
@@ -49,7 +49,7 @@ export default function WidgetPicker({ onAdd, onClose, devices = [] }) {
   };
 
   const handleSelectDevice = (device) => {
-    const type = familyToWidgetType(device.family);
+    const type = deviceToWidgetType(device);
     const config = deviceToWidgetConfig(device);
     onAdd(type, config);
     onClose();

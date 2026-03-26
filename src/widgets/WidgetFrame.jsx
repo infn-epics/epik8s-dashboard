@@ -1,4 +1,4 @@
-import { useState, useCallback, forwardRef, cloneElement, Children } from 'react';
+import { useState, useCallback, useMemo, forwardRef, cloneElement, Children } from 'react';
 import { createPortal } from 'react-dom';
 import { getWidgetType } from './registry.js';
 import { usePv } from '../hooks/usePv.js';
@@ -82,6 +82,27 @@ const WidgetFrame = forwardRef(function WidgetFrame(
 
   // Determine the connection PV to monitor
   const connectionPv = getConnectionPv(widget, typeDef);
+  const widgetPvs = useMemo(
+    () => extractWidgetPvs(widget, typeDef, connectionPv),
+    [widget, typeDef, connectionPv],
+  );
+  const deviceInfo = useMemo(() => ({
+    name: widget.config?.title || title,
+    iocName: widget.config?.iocName || '',
+    pvPrefix: widget.config?.pvPrefix || '',
+    zone: widget.config?.zone || '',
+    family: widget.config?.family || widget.type,
+  }), [widget, title]);
+  const widgetInfo = useMemo(() => ({
+    id: widget.id,
+    type: widget.type,
+    icon,
+    name: title,
+    subtitle,
+    category: typeDef?.category || '',
+    dataSource: typeDef?.dataSource || '',
+    config: widget.config || {},
+  }), [widget, icon, title, subtitle, typeDef]);
   const pvMsg = usePv(client, connectionPv);
 
   // Connection state: null = no PV, 'connected' | 'disconnected'
@@ -213,15 +234,13 @@ const WidgetFrame = forwardRef(function WidgetFrame(
                 </button>
               </>
             )}
-            {widget.config?.pvPrefix && (
-              <>
-                <div className="bll-context-menu-sep" />
-                <button className="bll-context-menu-item" onClick={() => { setShowChannelInfo(true); closeContextMenu(); }}>
-                  <span className="bll-context-menu-icon">📡</span>
-                  <span className="bll-context-menu-label">Channel Info</span>
-                </button>
-              </>
-            )}
+            <>
+              <div className="bll-context-menu-sep" />
+              <button className="bll-context-menu-item" onClick={() => { setShowChannelInfo(true); closeContextMenu(); }}>
+                <span className="bll-context-menu-icon">📡</span>
+                <span className="bll-context-menu-label">Widget Info</span>
+              </button>
+            </>
             {editMode && onConfigure && (
               <>
                 <div className="bll-context-menu-sep" />
@@ -260,13 +279,9 @@ const WidgetFrame = forwardRef(function WidgetFrame(
       {/* Channel Info Dialog */}
       {showChannelInfo && (
         <ChannelInfoDialog
-          device={{
-            name: widget.config?.title || title,
-            iocName: widget.config?.iocName || '',
-            pvPrefix: widget.config?.pvPrefix || '',
-            zone: widget.config?.zone || '',
-            family: widget.config?.family || widget.type,
-          }}
+          device={deviceInfo}
+          widget={widgetInfo}
+          pvs={widgetPvs}
           onClose={() => setShowChannelInfo(false)}
         />
       )}
@@ -290,6 +305,43 @@ function getConnectionPv(widget, typeDef) {
     return cfg.pvPrefix + suffix;
   }
   return null;
+}
+
+function extractWidgetPvs(widget, typeDef, connectionPv) {
+  const cfg = widget?.config || {};
+  const pvSet = new Set();
+
+  if (connectionPv) pvSet.add(connectionPv);
+
+  // Collect explicit PV fields from config.
+  for (const [key, value] of Object.entries(cfg)) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+
+    if (key === 'pv_name' || key === 'pvPrefix' || key === 'evrPrefix') {
+      pvSet.add(value.trim());
+      continue;
+    }
+
+    if (key.toLowerCase().includes('pv')) {
+      pvSet.add(value.trim());
+    }
+  }
+
+  // Expand line-based PV list used by plotting/data widgets.
+  if (typeof cfg.pvs === 'string' && cfg.pvs.trim()) {
+    cfg.pvs
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((pv) => pvSet.add(pv));
+  }
+
+  // If this is a device widget, include the conventional prefix lookup form.
+  if (cfg.pvPrefix && typeDef?.connectionSuffix !== undefined) {
+    pvSet.add(`${cfg.pvPrefix}${typeDef.connectionSuffix || ''}`);
+  }
+
+  return Array.from(pvSet);
 }
 
 export default WidgetFrame;

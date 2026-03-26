@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * Hook to subscribe to a PV via a PvwsClient instance.

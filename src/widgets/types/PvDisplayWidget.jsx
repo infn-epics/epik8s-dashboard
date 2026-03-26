@@ -1,4 +1,5 @@
 import { usePv } from '../../hooks/usePv.js';
+import { formatPvValue } from '../../components/common/PvControls.jsx';
 
 /**
  * PvDisplayWidget — displays a single PV value with alarm severity.
@@ -10,12 +11,7 @@ export default function PvDisplayWidget({ config, client }) {
   const val = pv?.value;
   const severity = pv?.severity || 'NONE';
 
-  let display = '---';
-  if (val !== null && val !== undefined) {
-    display = typeof val === 'number'
-      ? val.toFixed(config.precision ?? 2)
-      : String(val);
-  }
+  const display = formatPvValue(val, config.format || 'decimal', config.precision ?? 2);
 
   const sevClass = severity !== 'NONE' ? `pv-severity--${severity.toLowerCase()}` : '';
   const sizeClass = `pv-display--${config.fontSize || 'medium'}`;
@@ -23,7 +19,7 @@ export default function PvDisplayWidget({ config, client }) {
   return (
     <div className={`pv-display-widget ${sevClass} ${sizeClass}`}>
       <div className="pv-display-value">{display}</div>
-      {config.units && <div className="pv-display-unit">{config.units}</div>}
+      {config.showUnits !== false && config.units && <div className="pv-display-unit">{config.units}</div>}
       {config.showAlarm && severity !== 'NONE' && (
         <div className={`pv-display-alarm pv-alarm--${severity.toLowerCase()}`}>
           {severity}

@@ -1,4 +1,5 @@
 import { usePv } from '../../hooks/usePv.js';
+import { formatPvValue } from '../../components/common/PvControls.jsx';
 
 /**
  * TextUpdateWidget — Displays a PV value (read-only), just the text.
@@ -10,25 +11,7 @@ import { usePv } from '../../hooks/usePv.js';
 export default function TextUpdateWidget({ config, client }) {
   const pv = usePv(client, config.pv_name);
   const val = pv?.value;
-
-  let display = '---';
-  if (val !== null && val !== undefined) {
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (!isNaN(num)) {
-      switch (config.format) {
-        case 'exponential':
-          display = num.toExponential(config.precision ?? 2);
-          break;
-        case 'hex':
-          display = '0x' + Math.round(num).toString(16).toUpperCase();
-          break;
-        default:
-          display = num.toFixed(config.precision ?? 2);
-      }
-    } else {
-      display = String(val);
-    }
-  }
+  const display = formatPvValue(val, config.format || 'decimal', config.precision ?? 2);
 
   const style = {
     fontSize: config.fontSize ? `${config.fontSize}px` : undefined,
@@ -39,7 +22,7 @@ export default function TextUpdateWidget({ config, client }) {
   return (
     <div className="phoebus-text-update" style={style}>
       <span className="text-update-value">{display}</span>
-      {config.units && <span className="text-update-unit">{config.units}</span>}
+      {config.showUnits !== false && config.units && <span className="text-update-unit">{config.units}</span>}
     </div>
   );
 }

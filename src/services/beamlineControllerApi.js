@@ -588,6 +588,7 @@ export async function deployPlugin(controllerApiUrl, { name, git_url, path, pat,
   }
   const data = await resp.json().catch(() => null);
   if (!resp.ok) throw new Error(data?.detail || data?.message || `Deploy failed (${resp.status})`);
+  if (data?.ok === false) throw new Error(data?.message || 'Deploy was rejected by the controller');
   return data;
 }
 
@@ -599,6 +600,7 @@ export async function restartPlugin(controllerApiUrl, name) {
   const resp = await fetch(url, { method: 'POST' });
   const data = await resp.json().catch(() => null);
   if (!resp.ok) throw new Error(data?.detail || data?.message || `Restart failed (${resp.status})`);
+  if (data?.ok === false) throw new Error(data?.message || 'Restart was rejected by the controller');
   return data;
 }
 
@@ -632,6 +634,66 @@ export async function listControllerJobs(controllerApiUrl) {
   const resp = await fetch(url);
   const data = await resp.json().catch(() => null);
   if (!resp.ok) throw new Error(data?.detail || `Job listing failed (${resp.status})`);
+  return data;
+}
+
+/**
+ * Fetch startup/config metadata for a loaded task.
+ */
+export async function fetchControllerTaskStartup(controllerApiUrl, name) {
+  const base = controllerApiUrl.replace(/\/+$/, '');
+  const url = `${base}/api/v1/tasks/${encodeURIComponent(name)}/startup`;
+  const resp = await fetch(url);
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(data?.detail || `Task startup lookup failed (${resp.status})`);
+  return data;
+}
+
+/**
+ * Fetch startup/config metadata for a loaded job.
+ */
+export async function fetchControllerJobStartup(controllerApiUrl, name) {
+  const base = controllerApiUrl.replace(/\/+$/, '');
+  const url = `${base}/api/v1/jobs/${encodeURIComponent(name)}/startup`;
+  const resp = await fetch(url);
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(data?.detail || `Job startup lookup failed (${resp.status})`);
+  return data;
+}
+
+/**
+ * Run a loaded job from the controller.
+ */
+export async function runControllerJob(controllerApiUrl, name) {
+  const base = controllerApiUrl.replace(/\/+$/, '');
+  const url = `${base}/api/v1/jobs/${encodeURIComponent(name)}/run`;
+  const resp = await fetch(url, { method: 'POST' });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(data?.detail || `Job run failed (${resp.status})`);
+  return data;
+}
+
+/**
+ * Get details of a loaded plugin/task/job.
+ */
+export async function getControllerPlugin(controllerApiUrl, name) {
+  const base = controllerApiUrl.replace(/\/+$/, '');
+  const url = `${base}/api/v1/plugins/${encodeURIComponent(name)}`;
+  const resp = await fetch(url);
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(data?.detail || `Plugin lookup failed (${resp.status})`);
+  return data;
+}
+
+/**
+ * Remove (unload) a plugin from the controller.
+ */
+export async function removeControllerPlugin(controllerApiUrl, name) {
+  const base = controllerApiUrl.replace(/\/+$/, '');
+  const url = `${base}/api/v1/plugins/${encodeURIComponent(name)}`;
+  const resp = await fetch(url, { method: 'DELETE' });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(data?.detail || data?.message || `Remove failed (${resp.status})`);
   return data;
 }
 

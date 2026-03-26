@@ -40,7 +40,8 @@ function resolveFamily(ioc) {
 /**
  * Derive a device "type" from template / devtype.
  */
-function resolveType(ioc) {
+function resolveType(ioc, dev = null) {
+  if (dev && dev.devtype) return dev.devtype;
   return ioc.devtype || ioc.template || 'generic';
 }
 
@@ -73,17 +74,23 @@ export function parseDevices(config) {
     const ioc = deepMerge(defaults, rawIoc);
 
     const iocPrefix = ioc.iocprefix || '';
+    const iocRoot = ioc.iocroot || '';
     const family = resolveFamily(ioc);
-    const type = resolveType(ioc);
     const iocZone = resolveZone(ioc.zones);
     const httpPort = ioc.service?.http?.port || 8080;
     const isCamera = family === 'cam' || ioc.stream_enable;
-    const devs = ioc.devices || [];
+    const hasDeviceList = Array.isArray(ioc.devices) && ioc.devices.length > 0;
+    const devs = hasDeviceList
+      ? ioc.devices
+      : [{ name: ioc.name || iocPrefix || template || 'ioc', __iocLevel: true }];
 
     for (const dev of devs) {
       const deviceName = dev.name;
-      const pvPrefix = `${iocPrefix}:${deviceName}`;
+      const pvPrefix = dev.__iocLevel
+        ? (iocRoot ? `${iocPrefix}:${iocRoot}` : iocPrefix)
+        : (iocRoot ? `${iocPrefix}:${iocRoot}:${deviceName}` : `${iocPrefix}:${deviceName}`);
       const id = `${ioc.name}:${deviceName}`;
+      const type = resolveType(ioc, dev);
 
       // Device-level zones override IOC-level zones
       const devZone = dev.zones ? resolveZone(dev.zones) : iocZone;
@@ -100,6 +107,7 @@ export function parseDevices(config) {
         name: deviceName,
         iocName: ioc.name,
         iocPrefix,
+        iocRoot,
         pvPrefix,
         type,
         family,

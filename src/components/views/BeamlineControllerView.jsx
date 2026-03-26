@@ -28,12 +28,18 @@ import {
   fetchControllerHealth,
   listControllerTasks,
   listControllerJobs,
+  fetchControllerTaskStartup,
+  fetchControllerJobStartup,
+  runControllerJob,
+  getControllerPlugin,
+  removeControllerPlugin,
   generateFullConfigYaml,
   generateTaskPython,
 } from '../../services/beamlineControllerApi.js';
 import { parseGitUrl, commitFile } from '../../services/gitApi.js';
 import TaskJobWizard from '../common/TaskJobWizard.jsx';
 import ImportTaskDialog from '../common/ImportTaskDialog.jsx';
+import JobContextMenu from '../JobContextMenu.jsx';
 
 export default function BeamlineControllerView() {
   const { config, pvwsClient } = useApp();
@@ -185,7 +191,9 @@ export default function BeamlineControllerView() {
       <ControllerServicePanel
         serviceState={serviceState}
         apiUrl={controllerApiUrl}
+        controllerApiUrl={controllerApiUrl}
         configuredTaskCount={tasks.length}
+        pvwsClient={pvwsClient}
         onRefresh={refreshControllerService}
       />
 
@@ -315,9 +323,134 @@ export default function BeamlineControllerView() {
   );
 }
 
-function ControllerServicePanel({ serviceState, apiUrl, configuredTaskCount, onRefresh }) {
+function ControllerServicePanel({ serviceState, apiUrl, controllerApiUrl, configuredTaskCount, pvwsClient, onRefresh }) {
   const taskRunningCount = (serviceState.tasks || []).filter((t) => t.running).length;
+  const taskAvailableCount = (serviceState.tasks || []).filter((t) => t.status === 'available').length;
+  const taskInvalidCount = (serviceState.tasks || []).filter((t) => t.status === 'invalid').length;
+  const jobAvailableCount = (serviceState.jobs || []).filter((j) => j.status === 'available').length;
+  const jobInvalidCount = (serviceState.jobs || []).filter((j) => j.status === 'invalid').length;
   const healthOk = serviceState.health?.status === 'ok';
+  const [selectedPlugin, setSelectedPlugin] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [pendingAction, setPendingAction] = useState('');
+
+  useEffect(() => {
+    if (!selectedPlugin) return;
+    const pool = selectedPlugin.type === 'task' ? serviceState.tasks : serviceState.jobs;
+    const exists = (pool || []).some((p) => p.name === selectedPlugin.name);
+    if (!exists) {
+      setSelectedPlugin(null);
+    }
+  }, [selectedPlugin, serviceState.tasks, serviceState.jobs]);
+
+  const selectedData = useMemo(() => {
+    if (!selectedPlugin) return null;
+    const pool = selectedPlugin.type === 'task' ? serviceState.tasks : serviceState.jobs;
+    return (pool || []).find((p) => p.name === selectedPlugin.name) || null;
+  }, [selectedPlugin, serviceState.tasks, serviceState.jobs]);
+
+  const handleContextMenu = useCallback((e, pluginType, name) => {
+    e.preventDefault();
+    const pool = pluginType === 'task' ? serviceState.tasks : serviceState.jobs;
+    const plugin = (pool || []).find((p) => p.name === name);
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      item: { 
+        type: pluginType, 
+        name, 
+        status: plugin?.status || 'loaded',
+        running: plugin?.running || false,
+      },
+    });
+  }, [serviceState.tasks, serviceState.jobs]);
+
+  const handleViewDetails = useCallback((name) => {
+    const pool = contextMenu.item.type === 'task' ? serviceState.tasks : serviceState.jobs;
+    const plugin = (pool || []).find((p) => p.name === name);
+    if (plugin) {
+      setSelectedPlugin({ type: contextMenu.item.type, name });
+    }
+  }, [contextMenu, serviceState.tasks, serviceState.jobs]);
+
+  const handleRemovePlugin = useCallback(async (name) => {
+    if (!controllerApiUrl) return;
+    setPendingAction(`Removing ${name}...`);
+    try {
+      await removeControllerPlugin(controllerApiUrl, name);
+      setPendingAction(`Removed ${name}`);
+      setTimeout(() => onRefresh(), 500);
+    } catch (err) {
+      setPendingAction(`Failed to remove: ${err.message}`);
+    }
+  }, [controllerApiUrl, onRefresh]);
+
+  const handleRunPlugin = useCallback(async (name) => {
+    if (!controllerApiUrl) return;
+    setPendingAction(`Running ${name}...`);
+    try {
+      const result = await runControllerJob(controllerApiUrl, name);
+      setPendingAction(`Run completed: ${result?.result?.message || 'success'}`);
+    } catch (err) {
+      setPendingAction(`Run failed: ${err.message}`);
+    }
+  }, [controllerApiUrl]);
+
+  const handleDeployPlugin = useCallback(async (name) => {
+    if (!controllerApiUrl) return;
+    setPendingAction(`Deploying ${name}...`);
+    try {
+      // Get plugin details first to find git_url, branch, etc.
+      const pluginDetails = await getControllerPlugin(controllerApiUrl, name);
+      const deployParams = {
+        name,
+        git_url: pluginDetails.git_url || '',
+        branch: pluginDetails.branch || 'main',
+        path: pluginDetails.path || '',
+        auto_start: true,
+      };
+      
+      // First deployment call
+      const result = await deployPlugin(controllerApiUrl, deployParams);
+      
+      // Give it a moment to process, then verify it actually loaded
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      try {
+        const statusCheck = await getControllerPlugin(controllerApiUrl, name);
+        // If still available (not loaded), make the load call again
+        if (statusCheck?.status === 'available') {
+          setPendingAction(`Loading ${name} into service...`);
+          await deployPlugin(controllerApiUrl, deployParams);
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+      } catch (err) {
+        // Status check failed, assume it's loading
+      }
+      
+      const finalStatus = await getControllerPlugin(controllerApiUrl, name);
+      if (finalStatus?.status === 'available') {
+        throw new Error(`Controller kept ${name} in available state`);
+      }
+
+      setPendingAction(`✓ ${name} deployed and loaded successfully`);
+      setTimeout(() => onRefresh(), 1000);
+    } catch (err) {
+      setPendingAction(`Deploy failed: ${err.message}`);
+    }
+  }, [controllerApiUrl, onRefresh]);
+
+  const handleRestartPlugin = useCallback(async (name) => {
+    if (!controllerApiUrl) return;
+    setPendingAction(`Restarting ${name}...`);
+    try {
+      const result = await restartPlugin(controllerApiUrl, name);
+      setPendingAction(`Restarted ${name} successfully`);
+      setTimeout(() => onRefresh(), 800);
+    } catch (err) {
+      setPendingAction(`Restart failed: ${err.message}`);
+    }
+  }, [controllerApiUrl, onRefresh]);
 
   return (
     <div className="bc-service-panel">
@@ -341,7 +474,11 @@ function ControllerServicePanel({ serviceState, apiUrl, configuredTaskCount, onR
         <div className="bc-service-stat"><span>Configured tasks (UI)</span><strong>{configuredTaskCount}</strong></div>
         <div className="bc-service-stat"><span>Loaded tasks (service)</span><strong>{serviceState.tasks.length}</strong></div>
         <div className="bc-service-stat"><span>Running tasks</span><strong>{taskRunningCount}</strong></div>
+        <div className="bc-service-stat"><span>Available tasks (disk)</span><strong>{taskAvailableCount}</strong></div>
+        <div className="bc-service-stat"><span>Invalid tasks (disk)</span><strong>{taskInvalidCount}</strong></div>
         <div className="bc-service-stat"><span>Loaded jobs</span><strong>{serviceState.jobs.length}</strong></div>
+        <div className="bc-service-stat"><span>Available jobs (disk)</span><strong>{jobAvailableCount}</strong></div>
+        <div className="bc-service-stat"><span>Invalid jobs (disk)</span><strong>{jobInvalidCount}</strong></div>
         <div className="bc-service-stat"><span>Service version</span><strong>{serviceState.health?.version || '—'}</strong></div>
       </div>
 
@@ -354,9 +491,15 @@ function ControllerServicePanel({ serviceState, apiUrl, configuredTaskCount, onR
             <ul>
               {serviceState.tasks.map((t) => (
                 <li key={t.name}>
-                  <span className="name">{t.name}</span>
-                  <span className={`status ${t.running ? 'run' : 'idle'}`}>{t.running ? 'RUNNING' : 'IDLE'}</span>
-                  <span className="meta">{t.status || 'loaded'}</span>
+                  <button
+                    className={`bc-service-item ${selectedPlugin?.type === 'task' && selectedPlugin?.name === t.name ? 'active' : ''}`}
+                    onClick={() => setSelectedPlugin({ type: 'task', name: t.name })}
+                    onContextMenu={(e) => handleContextMenu(e, 'task', t.name)}
+                  >
+                    <span className="name">{t.name}</span>
+                    <span className={`status ${serviceStatusClass(t)}`}>{serviceStatusLabel(t)}</span>
+                    <span className="meta">{t.status || 'loaded'}</span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -371,9 +514,15 @@ function ControllerServicePanel({ serviceState, apiUrl, configuredTaskCount, onR
             <ul>
               {serviceState.jobs.map((j) => (
                 <li key={j.name}>
-                  <span className="name">{j.name}</span>
-                  <span className="status idle">LOADED</span>
-                  <span className="meta">{j.status || 'loaded'}</span>
+                  <button
+                    className={`bc-service-item ${selectedPlugin?.type === 'job' && selectedPlugin?.name === j.name ? 'active' : ''}`}
+                    onClick={() => setSelectedPlugin({ type: 'job', name: j.name })}
+                    onContextMenu={(e) => handleContextMenu(e, 'job', j.name)}
+                  >
+                    <span className="name">{j.name}</span>
+                    <span className={`status ${serviceStatusClass(j)}`}>{serviceStatusLabel(j)}</span>
+                    <span className="meta">{j.status || 'loaded'}</span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -381,8 +530,338 @@ function ControllerServicePanel({ serviceState, apiUrl, configuredTaskCount, onR
         </div>
       </div>
 
+      {selectedData && (
+        <ServicePluginDetailPanel
+          plugin={selectedData}
+          pluginType={selectedPlugin?.type || selectedData.plugin_type}
+          pvwsClient={pvwsClient}
+          controllerApiUrl={controllerApiUrl}
+        />
+      )}
+
+      {pendingAction && (
+        <div className="bc-service-msg">{pendingAction}</div>
+      )}
+
+      {contextMenu && (
+        <JobContextMenu
+          item={contextMenu.item}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onViewDetails={handleViewDetails}
+          onDeploy={handleDeployPlugin}
+          onRestart={handleRestartPlugin}
+          onRun={handleRunPlugin}
+          onRemove={handleRemovePlugin}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
       {serviceState.updatedAt && (
         <div className="bc-service-updated">Updated: {serviceState.updatedAt.toLocaleTimeString()}</div>
+      )}
+    </div>
+  );
+}
+
+function buildServicePvName(pvPrefix, pvName) {
+  if (!pvPrefix || !pvName) return null;
+  return `${pvPrefix}:${pvName}`;
+}
+
+async function copyPvToClipboard(pvName) {
+  if (!pvName || !navigator?.clipboard?.writeText) return;
+  try {
+    await navigator.clipboard.writeText(pvName);
+  } catch (err) {
+    // Best-effort copy only.
+  }
+}
+
+function pvHintProps(pvName) {
+  return pvName
+    ? {
+        title: `PV: ${pvName} (right-click to copy)`,
+        onContextMenu: (e) => {
+          e.preventDefault();
+          copyPvToClipboard(pvName);
+        },
+      }
+    : {};
+}
+
+function serviceStatusLabel(plugin) {
+  if (!plugin) return 'UNKNOWN';
+  if (plugin.running) return 'RUNNING';
+  if (plugin.status === 'available') return 'AVAILABLE';
+  if (plugin.status === 'invalid') return 'INVALID';
+  if (plugin.status === 'error') return 'ERROR';
+  if (plugin.status === 'stopped') return 'STOPPED';
+  return 'LOADED';
+}
+
+function serviceStatusClass(plugin) {
+  const label = serviceStatusLabel(plugin);
+  if (label === 'RUNNING') return 'run';
+  if (label === 'AVAILABLE') return 'avail';
+  if (label === 'INVALID' || label === 'ERROR') return 'err';
+  if (label === 'STOPPED') return 'stop';
+  return 'idle';
+}
+
+const BASE_CONTROL_PV_TYPES = {
+  ENABLE: 'bool',
+  STATUS: 'int',
+  MESSAGE: 'string',
+  CYCLE_COUNT: 'int',
+  RUN: 'bool',
+};
+
+function defaultBaseControls(pluginType, mode) {
+  if (pluginType === 'task') {
+    const controls = ['ENABLE', 'STATUS', 'MESSAGE'];
+    controls.push(mode === 'triggered' ? 'RUN' : 'CYCLE_COUNT');
+    return controls;
+  }
+  return ['STATUS', 'MESSAGE'];
+}
+
+function ServicePluginDetailPanel({ plugin, pluginType, pvwsClient, controllerApiUrl }) {
+  const [startupInfo, setStartupInfo] = useState(null);
+  const [startupError, setStartupError] = useState('');
+  const [jobRunStatus, setJobRunStatus] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStartup() {
+      if (!controllerApiUrl || !plugin?.name) {
+        setStartupInfo(null);
+        setStartupError('');
+        return;
+      }
+      const hasInlineStartup = plugin.start_parameters || plugin.pv_definitions || plugin.built_pvs;
+      if (hasInlineStartup) {
+        setStartupInfo(null);
+        setStartupError('');
+        return;
+      }
+      try {
+        const data = pluginType === 'job'
+          ? await fetchControllerJobStartup(controllerApiUrl, plugin.name)
+          : await fetchControllerTaskStartup(controllerApiUrl, plugin.name);
+        if (!cancelled) {
+          setStartupInfo(data);
+          setStartupError('');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setStartupInfo(null);
+          setStartupError(err.message || 'Unable to load startup metadata');
+        }
+      }
+    }
+    loadStartup();
+    return () => {
+      cancelled = true;
+    };
+  }, [controllerApiUrl, plugin?.name, plugin?.built_pvs, plugin?.pv_definitions, plugin?.start_parameters, pluginType]);
+
+  const merged = startupInfo || plugin;
+  const mode = merged.mode || merged.start_parameters?.mode || 'continuous';
+  const baseControls = merged.base_control_pvs || defaultBaseControls(pluginType, mode);
+  const pvPrefix = merged.pv_prefix || plugin.pv_prefix;
+  const inputDefs = merged.pv_definitions?.inputs || {};
+  const outputDefs = merged.pv_definitions?.outputs || {};
+  const params = merged.start_parameters || {};
+
+  const handleRunJob = async () => {
+    if (!controllerApiUrl) {
+      setJobRunStatus('Controller API URL not configured');
+      return;
+    }
+    setJobRunStatus('Running...');
+    try {
+      const result = await runControllerJob(controllerApiUrl, plugin.name);
+      setJobRunStatus(result?.result?.message || 'Run completed');
+    } catch (err) {
+      setJobRunStatus(err.message || 'Run failed');
+    }
+  };
+
+  return (
+    <div className="bc-service-detail">
+      <div className="bc-service-detail-head">
+        <h5>{pluginType === 'job' ? 'Job' : 'Task'} Details: {plugin.name}</h5>
+        {pluginType === 'job' && (
+          <button className="bc-pv-btn" onClick={handleRunJob}>Run Job</button>
+        )}
+      </div>
+
+      {jobRunStatus && <div className="bc-service-msg">{jobRunStatus}</div>}
+      {startupError && <div className="bc-service-msg bc-service-msg--error">{startupError}</div>}
+
+      <div className="bc-service-config-grid">
+        <div><span className="k">Class</span><span className="v">{plugin.class_name || '—'}</span></div>
+        <div><span className="k">Branch</span><span className="v">{plugin.branch || 'main'}</span></div>
+        <div><span className="k">Plugin Path</span><span className="v">{plugin.path || '(root)'}</span></div>
+        <div><span className="k">Plugin Prefix</span><span className="v">{merged.plugin_prefix || plugin.plugin_prefix || '—'}</span></div>
+        <div><span className="k">PV Prefix</span><span className="v">{pvPrefix || '—'}</span></div>
+        <div><span className="k">State</span><span className="v">{serviceStatusLabel(plugin)}</span></div>
+      </div>
+
+      {plugin.validation?.errors?.length > 0 && (
+        <div className="bc-detail-section">
+          <h4>Validation Errors</h4>
+          <div className="bc-service-validation-list">
+            {plugin.validation.errors.map((err, idx) => (
+              <div key={`${plugin.name}-validation-${idx}`} className="bc-service-validation-item">
+                {err}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {Object.keys(params).length > 0 && (
+        <div className="bc-detail-section">
+          <h4>Start Parameters</h4>
+          <div className="bc-detail-grid">
+            {Object.entries(params).map(([k, v]) => (
+              <div key={k} className="bc-detail-row">
+                <span className="bc-detail-key">{k}</span>
+                <span className="bc-detail-val">{JSON.stringify(v)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pvPrefix && baseControls.length > 0 && (
+        <div className="bc-detail-section">
+          <h4>Base Control PVs</h4>
+          <div className="bc-pv-list">
+            {baseControls.map((pvName) => {
+              const fullName = buildServicePvName(pvPrefix, pvName);
+              const writable = pluginType === 'task' && (pvName === 'ENABLE' || pvName === 'RUN');
+              return (
+                <ServicePvRow
+                  key={pvName}
+                  pvName={pvName}
+                  fullPvName={fullName}
+                  pvwsClient={pvwsClient}
+                  writable={writable}
+                  type={BASE_CONTROL_PV_TYPES[pvName] || 'int'}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {pvPrefix && Object.keys(inputDefs).length > 0 && (
+        <div className="bc-detail-section">
+          <h4>Task/Job Input PVs</h4>
+          <div className="bc-pv-list">
+            {Object.entries(inputDefs).map(([pvName, cfg]) => (
+              <ServicePvRow
+                key={pvName}
+                pvName={pvName}
+                fullPvName={buildServicePvName(pvPrefix, pvName)}
+                pvwsClient={pvwsClient}
+                writable={true}
+                type={cfg?.type || 'float'}
+                unit={cfg?.unit}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pvPrefix && Object.keys(outputDefs).length > 0 && (
+        <div className="bc-detail-section">
+          <h4>Task/Job Output PVs</h4>
+          <div className="bc-pv-list">
+            {Object.entries(outputDefs).map(([pvName, cfg]) => (
+              <ServicePvRow
+                key={pvName}
+                pvName={pvName}
+                fullPvName={buildServicePvName(pvPrefix, pvName)}
+                pvwsClient={pvwsClient}
+                writable={false}
+                type={cfg?.type || 'float'}
+                unit={cfg?.unit}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ServicePvRow({ pvName, fullPvName, pvwsClient, writable, type, unit }) {
+  const pvData = usePv(pvwsClient, fullPvName);
+  const value = pvData?.value ?? '—';
+  const statusCode = pvName === 'STATUS' && value !== '—' ? Number(value) : null;
+  const valueText = statusCode !== null && Number.isFinite(statusCode)
+    ? `${statusCode} (${statusLabel(statusCode)})`
+    : String(value);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const handleToggle = () => {
+    if (!pvwsClient || !writable || !fullPvName) return;
+    pvwsClient.put(fullPvName, value === 1 ? 0 : 1);
+  };
+
+  const handleWrite = () => {
+    if (!pvwsClient || !writable || !fullPvName) return;
+    let v = editValue;
+    if (type === 'float') v = parseFloat(v);
+    else if (type === 'int' || type === 'bool') v = parseInt(v, 10);
+    pvwsClient.put(fullPvName, v);
+    setEditing(false);
+  };
+
+  return (
+    <div className="bc-pv-row" {...pvHintProps(fullPvName)}>
+      <span className="bc-pv-name" title={fullPvName || ''}>
+        {pvName}
+        <span className="bc-pv-type">{type || 'float'}</span>
+      </span>
+      <span className="bc-pv-value">{valueText}</span>
+      {unit && <span className="bc-pv-unit">{unit}</span>}
+
+      {writable && (type === 'bool' || pvName === 'RUN' || pvName === 'ENABLE') && (
+        <button className="bc-pv-btn" onClick={handleToggle}>
+          {value === 1 ? '⏸' : '▶'}
+        </button>
+      )}
+
+      {writable && type !== 'bool' && pvName !== 'RUN' && pvName !== 'ENABLE' && (
+        editing ? (
+          <span className="bc-pv-edit">
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleWrite()}
+              autoFocus
+            />
+            <button className="bc-pv-btn" onClick={handleWrite}>✓</button>
+            <button className="bc-pv-btn" onClick={() => setEditing(false)}>✗</button>
+          </span>
+        ) : (
+          <button
+            className="bc-pv-btn"
+            onClick={() => {
+              setEditValue(String(value === '—' ? '' : value));
+              setEditing(true);
+            }}
+          >
+            ✏
+          </button>
+        )
       )}
     </div>
   );
@@ -613,7 +1092,7 @@ function PvMonitorRow({ pv, pvwsClient, prefix, taskName }) {
   };
 
   return (
-    <div className="bc-pv-row">
+    <div className="bc-pv-row" {...pvHintProps(pv.name)}>
       <span className="bc-pv-name" title={pv.name}>
         {pv.key}
       </span>
@@ -651,7 +1130,7 @@ function TaskPvRow({ name, config, prefix, taskName, pvwsClient, writable }) {
   };
 
   return (
-    <div className="bc-pv-row">
+    <div className="bc-pv-row" {...pvHintProps(fullPvName)}>
       <span className="bc-pv-name" title={fullPvName}>
         {name}
         <span className="bc-pv-type">{config.type || 'float'}</span>

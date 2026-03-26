@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { usePv } from '../../hooks/usePv.js';
-import { PvDisplay, PvInput } from '../../components/common/PvControls.jsx';
+import { PvDisplay, PvInput, getPvText } from '../../components/common/PvControls.jsx';
 
 /**
  * TimingWidget — MRF Timing system (EVG + EVR) control panel.
@@ -95,7 +95,7 @@ function DGRowEssential({ idx, evrPrefix, client, precision }) {
   return (
     <tr>
       <td className="timing-dg-idx">DG{idx}</td>
-      <td className="timing-dg-label">{label?.value ?? '—'}</td>
+      <td className="timing-dg-label">{getPvText(label) || '—'}</td>
       <td>{delay?.value != null ? Number(delay.value).toFixed(precision) : '—'}</td>
       <td>{width?.value != null ? Number(width.value).toFixed(precision) : '—'}</td>
       <td>{evt?.value ?? '—'}</td>
@@ -253,7 +253,7 @@ function DGRowDetail({ idx, evrPrefix, client, precision }) {
   return (
     <tr>
       <td className="timing-dg-idx">DG{idx}</td>
-      <td className="timing-dg-label">{label?.value ?? '—'}</td>
+      <td className="timing-dg-label">{getPvText(label) || '—'}</td>
       <td><PvInput client={client} pvName={`${evrPrefix}:DlyGen${idx}Delay-SP`} step={0.01} /></td>
       <td><PvInput client={client} pvName={`${evrPrefix}:DlyGen${idx}Width-SP`} step={1} /></td>
       <td>{polarity?.value ?? '—'}</td>
@@ -302,7 +302,7 @@ function OutputRow({ outName, outLabel, evrPrefix, client }) {
   return (
     <tr>
       <td>{outLabel}</td>
-      <td className="timing-dg-label">{label?.value ?? '—'}</td>
+      <td className="timing-dg-label">{getPvText(label) || '—'}</td>
       <td>{src?.value ?? '—'}</td>
     </tr>
   );

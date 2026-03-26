@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 
+async function copyPvToClipboard(pvName) {
+  if (!pvName || !navigator?.clipboard?.writeText) return;
+  try {
+    await navigator.clipboard.writeText(pvName);
+  } catch (err) {
+    // Best-effort copy only.
+  }
+}
+
 /**
  * PlotWidget — time-series plot from EPICS Archiver.
  * Renders a simple canvas-based line chart.
@@ -142,7 +151,17 @@ export default function PlotWidget({ config, client }) {
       )}
       <canvas ref={canvasRef} className="plot-canvas" />
       <div className="plot-footer">
-        <span className="plot-pv">{config.pvName}</span>
+        <span
+          className="plot-pv"
+          title={config.pvName ? `PV: ${config.pvName} (right-click to copy)` : ''}
+          onContextMenu={(e) => {
+            if (!config.pvName) return;
+            e.preventDefault();
+            copyPvToClipboard(config.pvName);
+          }}
+        >
+          {config.pvName}
+        </span>
         <span className="plot-range">{config.timeRange || '1h'}</span>
       </div>
     </div>

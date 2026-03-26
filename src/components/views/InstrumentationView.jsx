@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import DashboardGrid from '../layout/DashboardGrid.jsx';
 import { useLayout } from '../../hooks/useLayout.js';
-import { getWidgetComponent as getWidgetComp, familyToWidgetType } from '../../widgets/registry.js';
+import { getWidgetComponent as getWidgetComp, deviceToWidgetType } from '../../widgets/registry.js';
 import { widgetSizeMap } from '../../widgets/registry.js';
 import WidgetFrame from '../../widgets/WidgetFrame.jsx';
 import { deviceToWidgetConfig } from '../../models/dashboard.js';
@@ -91,8 +91,8 @@ export default function InstrumentationView() {
         ) : layoutMode === 'row' ? (
           <div className="instr-row-strip">
             {visibleDevices.map((device) => {
-              const widgetType = familyToWidgetType(device.family);
-              const Component = getWidgetComp(widgetType);
+              const widgetType = deviceToWidgetType(device);
+              const Component = getWidgetComp(widgetType, device);
               const config = { ...deviceToWidgetConfig(device), viewMode: 'essential' };
               const widget = { id: device.id, type: widgetType, config };
               return (
@@ -117,8 +117,8 @@ export default function InstrumentationView() {
             isResizable={editMode}
           >
             {visibleDevices.map((device) => {
-              const widgetType = familyToWidgetType(device.family);
-              const Component = getWidgetComp(widgetType);
+              const widgetType = deviceToWidgetType(device);
+              const Component = getWidgetComp(widgetType, device);
               const config = deviceToWidgetConfig(device);
               const widget = { id: device.id, type: widgetType, config };
               return (

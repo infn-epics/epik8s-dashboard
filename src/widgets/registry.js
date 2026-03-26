@@ -14,26 +14,33 @@
  *  - Devices (Camera, Motor, BPM, Vacuum, Power Supply, Charge Monitor)
  */
 
-/* === Widget type imports === */
-import LabelWidget from './types/LabelWidget.jsx';
-import TextUpdateWidget from './types/TextUpdateWidget.jsx';
-import TextEntryWidget from './types/TextEntryWidget.jsx';
-import BooleanButtonWidget from './types/BooleanButtonWidget.jsx';
-import ActionButtonWidget from './types/ActionButtonWidget.jsx';
-import ComboBoxWidget from './types/ComboBoxWidget.jsx';
-import LEDWidget from './types/LEDWidget.jsx';
-import SliderWidget from './types/SliderWidget.jsx';
-import GaugeWidget from './types/GaugeWidget.jsx';
-import DataBrowserWidget from './types/DataBrowserWidget.jsx';
-import CameraWidget from './types/CameraWidget.jsx';
-import MotorWidget from './types/MotorWidget.jsx';
-import BPMWidget from './types/BPMWidget.jsx';
-import VacuumWidget from './types/VacuumWidget.jsx';
-import PowerSupplyWidget from './types/PowerSupplyWidget.jsx';
-import ChargeMonitorWidget from './types/ChargeMonitorWidget.jsx';
-import GenericPVWidget from './types/GenericPVWidget.jsx';
-import LLRFWidget from './types/LLRFWidget.jsx';
-import TimingWidget from './types/TimingWidget.jsx';
+/* === Widget type imports (auto-discovered from families tree) === */
+const FAMILY_WIDGET_MODULES = import.meta.glob('./families/**/*.jsx', { eager: true });
+
+function familyWidget(path, fallback = null) {
+  return FAMILY_WIDGET_MODULES[path]?.default || fallback;
+}
+
+const GenericPVWidget = familyWidget('./families/generic/GenericPV.jsx') || familyWidget('./families/io/Generic.jsx');
+const LabelWidget = familyWidget('./families/basic/Label.jsx', GenericPVWidget);
+const TextUpdateWidget = familyWidget('./families/basic/TextUpdate.jsx', GenericPVWidget);
+const TextEntryWidget = familyWidget('./families/basic/TextEntry.jsx', GenericPVWidget);
+const BooleanButtonWidget = familyWidget('./families/basic/BooleanButton.jsx', GenericPVWidget);
+const ActionButtonWidget = familyWidget('./families/basic/ActionButton.jsx', GenericPVWidget);
+const ComboBoxWidget = familyWidget('./families/basic/ComboBox.jsx', GenericPVWidget);
+const LEDWidget = familyWidget('./families/basic/LED.jsx', GenericPVWidget);
+const SliderWidget = familyWidget('./families/numeric/Slider.jsx', GenericPVWidget);
+const GaugeWidget = familyWidget('./families/numeric/Gauge.jsx', GenericPVWidget);
+const DataBrowserWidget = familyWidget('./families/plot/DataBrowser.jsx', GenericPVWidget);
+const CameraWidget = familyWidget('./families/cam/Camera.jsx', GenericPVWidget);
+const MotorWidget = familyWidget('./families/mot/Motor.jsx', GenericPVWidget);
+const BPMWidget = familyWidget('./families/bpm/BPM.jsx', GenericPVWidget);
+const VacuumWidget = familyWidget('./families/vac/Vacuum.jsx', GenericPVWidget);
+const PowerSupplyWidget = familyWidget('./families/mag/PowerSupply.jsx', GenericPVWidget);
+const ChargeMonitorWidget = familyWidget('./families/generic/ChargeMonitor.jsx', GenericPVWidget);
+const LLRFWidget = familyWidget('./families/rf/LLRF.jsx', GenericPVWidget);
+const TimingWidget = familyWidget('./families/timing/Timing.jsx', GenericPVWidget);
+const CoolingWidget = familyWidget('./families/cool/Generic.jsx', GenericPVWidget);
 
 /* ==========================================
    Universal Base Properties (Phoebus-like)
@@ -75,6 +82,14 @@ const VIEW_MODE_PROPERTY = [
   { key: 'viewMode', label: 'View Mode', type: 'select', default: 'essential', options: ['essential', 'detail'], group: 'Widget' },
 ];
 
+/** Numeric display properties for readback widgets. */
+const NUMERIC_DISPLAY_PROPERTIES = [
+  { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+  { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 10, group: 'Widget' },
+  { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
+  { key: 'units', label: 'Units', type: 'string', default: '', group: 'Widget' },
+];
+
 /** Combine base + given arrays. */
 function props(...arrays) {
   return [...BASE_PROPERTIES, ...arrays.flat()];
@@ -111,11 +126,7 @@ const WIDGET_TYPES = {
     description: 'Displays a PV value (read-only)',
     dataSource: 'pvws',
     defaultSize: { w: 2, h: 1, minW: 1, minH: 1 },
-    properties: props(PV_PROPERTIES, STYLE_PROPERTIES, [
-      { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 10, group: 'Widget' },
-      { key: 'units', label: 'Units', type: 'string', default: '', group: 'Widget' },
-      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'hex', 'string'], group: 'Widget' },
-    ]),
+    properties: props(PV_PROPERTIES, STYLE_PROPERTIES, NUMERIC_DISPLAY_PROPERTIES),
     component: TextUpdateWidget,
   },
 
@@ -218,6 +229,7 @@ const WIDGET_TYPES = {
       { key: 'step', label: 'Step', type: 'number', default: 1, group: 'Widget' },
       { key: 'showValue', label: 'Show Value', type: 'boolean', default: true, group: 'Widget' },
       { key: 'showLimits', label: 'Show Limits', type: 'boolean', default: true, group: 'Widget' },
+      ...NUMERIC_DISPLAY_PROPERTIES,
     ]),
     component: SliderWidget,
   },
@@ -233,10 +245,10 @@ const WIDGET_TYPES = {
     properties: props(PV_PROPERTIES, STYLE_PROPERTIES, [
       { key: 'min', label: 'Min', type: 'number', default: 0, group: 'Widget' },
       { key: 'max', label: 'Max', type: 'number', default: 100, group: 'Widget' },
-      { key: 'units', label: 'Units', type: 'string', default: '', group: 'Widget' },
       { key: 'warningHigh', label: 'Warning High', type: 'number', default: 80, group: 'Widget' },
       { key: 'alarmHigh', label: 'Alarm High', type: 'number', default: 90, group: 'Widget' },
       { key: 'showTicks', label: 'Show Ticks', type: 'boolean', default: true, group: 'Widget' },
+      ...NUMERIC_DISPLAY_PROPERTIES,
     ]),
     component: GaugeWidget,
   },
@@ -294,6 +306,8 @@ const WIDGET_TYPES = {
     defaultSize: { w: 4, h: 6, minW: 3, minH: 4 },
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'precision', label: 'Precision', type: 'number', default: 4, min: 0, max: 10, group: 'Widget' },
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
       { key: 'showExpert', label: 'Show Expert Panel', type: 'boolean', default: false, group: 'Widget' },
     ]),
     component: MotorWidget,
@@ -311,6 +325,8 @@ const WIDGET_TYPES = {
     defaultSize: { w: 3, h: 3, minW: 2, minH: 2 },
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'precision', label: 'Precision', type: 'number', default: 3, group: 'Widget' },
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
       { key: 'showCharge', label: 'Show Charge', type: 'boolean', default: true, group: 'Widget' },
     ]),
     component: BPMWidget,
@@ -322,16 +338,37 @@ const WIDGET_TYPES = {
     icon: '💨',
     category: 'Devices',
     family: 'vac',
-    connectionSuffix: ':Pressure',
-    description: 'Pressure display and valve control',
+    connectionSuffix: ':PRES_RB',
+    description: 'Pressure display and enum status',
     dataSource: 'pvws',
     defaultSize: { w: 3, h: 3, minW: 2, minH: 2 },
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'pressureUnit', label: 'Pressure Unit', type: 'select', default: 'mbar', options: ['mbar', 'torr', 'Pa', 'atm'], group: 'Widget' },
-      { key: 'hasValve', label: 'Has Valve', type: 'boolean', default: true, group: 'Widget' },
+      { key: 'pressureFormat', label: 'Pressure Format', type: 'select', default: 'exponential', options: ['decimal', 'exponential', 'engineering', 'string'], group: 'Widget' },
+      { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 10, group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
       { key: 'alarmThreshold', label: 'Alarm Threshold', type: 'number', default: 1e-5, group: 'Widget' },
     ]),
     component: VacuumWidget,
+  },
+
+  cooling: {
+    type: 'cooling',
+    name: 'Cooling Channel',
+    icon: '❄️',
+    category: 'Devices',
+    family: 'cool',
+    connectionSuffix: ':TEMP_RB',
+    description: 'Cooling channel with TEMP/STATE readback and setpoints',
+    dataSource: 'pvws',
+    defaultSize: { w: 3, h: 3, minW: 2, minH: 2 },
+    properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 10, group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
+      { key: 'units', label: 'Units', type: 'string', default: 'degC', group: 'Widget' },
+    ]),
+    component: CoolingWidget,
   },
 
   'power-supply': {
@@ -348,6 +385,8 @@ const WIDGET_TYPES = {
       { key: 'maxCurrent', label: 'Max Current (A)', type: 'number', default: 100, group: 'Widget' },
       { key: 'maxVoltage', label: 'Max Voltage (V)', type: 'number', default: 50, group: 'Widget' },
       { key: 'precision', label: 'Precision', type: 'number', default: 3, group: 'Widget' },
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
     ]),
     component: PowerSupplyWidget,
   },
@@ -365,6 +404,8 @@ const WIDGET_TYPES = {
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'units', label: 'Units', type: 'string', default: 'pC', group: 'Widget' },
       { key: 'precision', label: 'Precision', type: 'number', default: 3, group: 'Widget' },
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
       { key: 'showTrend', label: 'Show Trend', type: 'boolean', default: true, group: 'Widget' },
       { key: 'trendLength', label: 'Trend Points', type: 'number', default: 50, min: 10, max: 200, group: 'Widget' },
     ]),
@@ -398,6 +439,8 @@ const WIDGET_TYPES = {
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'channel', label: 'Default Channel', type: 'select', default: 'ch1', options: ['ch1','ch2','ch3','ch4','ch5','ch6','ch7','ch8'], group: 'Widget' },
       { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 6, group: 'Widget' },
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
       { key: 'conditioningPrefix', label: 'Conditioning IOC Prefix', type: 'string', default: '', group: 'Widget', placeholder: 'SPARC:RF:CONDITIONING01' },
     ]),
     component: LLRFWidget,
@@ -412,11 +455,13 @@ const WIDGET_TYPES = {
     connectionSuffix: ':EvtClkPll-Sts',
     description: 'MRF timing — EVG clock, multiplexed counters, trigger events, EVR delay generators, outputs',
     dataSource: 'pvws',
-    defaultSize: { w: 5, h: 6, minW: 3, minH: 4 },
+    defaultSize: { w: 7, h: 6, minW: 5, minH: 4 },
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'evrPrefix', label: 'EVR Device Prefix', type: 'pv', default: '', group: 'Device', placeholder: 'MRF01:EVR' },
       { key: 'numDelayGens', label: 'Delay Generators', type: 'number', default: 9, min: 1, max: 16, group: 'Widget' },
       { key: 'precision', label: 'Precision', type: 'number', default: 2, min: 0, max: 6, group: 'Widget' },
+      { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
+      { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
     ]),
     component: TimingWidget,
   },
@@ -447,8 +492,26 @@ export function getWidgetType(type) {
   return WIDGET_TYPES[type] || null;
 }
 
+function resolveHierarchyComponent(device) {
+  const family = (device?.family || '').toString().toLowerCase();
+  const rawType = (device?.type || '').toString().toUpperCase();
+  if (!family) return null;
+
+  const specialized = rawType ? familyWidget(`./families/${family}/${rawType}.jsx`) : null;
+  if (specialized) return specialized;
+
+  const generic = familyWidget(`./families/${family}/Generic.jsx`);
+  if (generic) return generic;
+
+  return familyWidget('./families/generic/GenericPV.jsx') || null;
+}
+
 /** Get the React component for a widget type. */
-export function getWidgetComponent(type) {
+export function getWidgetComponent(type, device = null) {
+  if (device) {
+    const hierarchyComponent = resolveHierarchyComponent(device);
+    if (hierarchyComponent) return hierarchyComponent;
+  }
   return WIDGET_TYPES[type]?.component || GenericPVWidget;
 }
 
@@ -475,12 +538,29 @@ const FAMILY_TO_TYPE = {
   rf: 'llrf',
   timing: 'timing',
   io: 'generic-pv',
-  cool: 'generic-pv',
+  cool: 'cooling',
+  mps: 'generic-pv',
   generic: 'generic-pv',
 };
 
 export function familyToWidgetType(family) {
   return FAMILY_TO_TYPE[family] || 'generic-pv';
+}
+
+/** Map a full normalized device to the best widget type key. */
+export function deviceToWidgetType(device) {
+  const family = device?.family;
+  const rawType = (device?.type || '').toString().toLowerCase();
+
+  if (family === 'io') {
+    if (rawType === 'di') return 'led';
+    if (rawType === 'do') return 'boolean-button';
+    if (rawType === 'rly') return 'boolean-button';
+    if (rawType === 'ao') return 'text-entry';
+    if (rawType === 'ai' || rawType === 'rtd') return 'text-update';
+  }
+
+  return familyToWidgetType(family);
 }
 
 /** Widget size map for auto-layout (backward compat). */

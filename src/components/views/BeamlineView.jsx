@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import DashboardGrid from '../layout/DashboardGrid.jsx';
 import { useLayout } from '../../hooks/useLayout.js';
-import { getWidgetComponent as getWidgetComp, familyToWidgetType } from '../../widgets/registry.js';
+import { getWidgetComponent as getWidgetComp, deviceToWidgetType } from '../../widgets/registry.js';
 import WidgetFrame from '../../widgets/WidgetFrame.jsx';
 import { deviceToWidgetConfig } from '../../models/dashboard.js';
 import { groupDevicesBy } from '../../models/device.js';
@@ -131,8 +131,8 @@ function ZoneGridSection({ zone, devices, client, editMode }) {
       </div>
       <DashboardGrid layout={layout} onLayoutChange={onLayoutChange} isDraggable={editMode} isResizable={editMode} rowHeight={50}>
         {devices.map((device) => {
-          const widgetType = familyToWidgetType(device.family);
-          const Component = getWidgetComp(widgetType);
+          const widgetType = deviceToWidgetType(device);
+            const Component = getWidgetComp(widgetType, device);
           const config = deviceToWidgetConfig(device);
           const widget = { id: device.id, type: widgetType, config };
           return (

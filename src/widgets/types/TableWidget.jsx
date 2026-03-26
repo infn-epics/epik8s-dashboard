@@ -1,6 +1,15 @@
 import { useMemo } from 'react';
 import { usePv } from '../../hooks/usePv.js';
 
+async function copyPvToClipboard(pvName) {
+  if (!pvName || !navigator?.clipboard?.writeText) return;
+  try {
+    await navigator.clipboard.writeText(pvName);
+  } catch (err) {
+    // Best-effort copy only.
+  }
+}
+
 /**
  * TableWidget — multi-PV status table.
  *
@@ -50,7 +59,14 @@ function TableRow({ pv, client, config }) {
   const sevClass = severity !== 'NONE' ? `pv-severity--${severity.toLowerCase()}` : '';
 
   return (
-    <tr className={sevClass}>
+    <tr
+      className={sevClass}
+      title={`PV: ${pv} (right-click to copy)`}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        copyPvToClipboard(pv);
+      }}
+    >
       <td className="table-pv-name">{pv}</td>
       <td className="table-pv-value">{display}</td>
       {config.showSeverity !== false && (
