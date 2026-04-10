@@ -7,6 +7,7 @@ import HelpPanel from '../common/HelpPanel.jsx';
 import Sidebar from './Sidebar.jsx';
 import ChatConsole from '../consoles/ChatConsole.jsx';
 import SystemConsole from '../consoles/SystemConsole.jsx';
+import CertWarningBanner from '../common/CertWarningBanner.jsx';
 
 /**
  * AppShell — professional layout with grouped navbar, console panels, sidebar.
@@ -187,6 +188,8 @@ export default function AppShell({ children, theme, onToggleTheme }) {
           <UserMenu />
         </div>
       </header>
+
+      <CertWarningBanner />
 
       <div className="app-body">
         {isDashboard && (
