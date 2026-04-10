@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
-import { buildBackendUrl } from '../../services/k8sApi.js';
-import { buildControllerApiUrl } from '../../services/beamlineControllerApi.js';
-import { buildChannelFinderUrl } from '../../services/channelFinderApi.js';
 
 /**
  * Probe an HTTPS URL.
@@ -27,35 +24,33 @@ async function probeUrl(url) {
 
 /**
  * Collect all known HTTPS service endpoints from the YAML config.
+ * Always builds https:// URLs regardless of how the dashboard itself is served.
  */
 function collectEndpoints(config) {
   const endpoints = [];
+  const ns = config?.namespace || '';
+  const domain = config?.epik8namespace || '';
+  if (!ns || !domain) return endpoints;
 
-  const backendUrl = buildBackendUrl(config);
-  if (backendUrl?.startsWith('https://')) {
-    endpoints.push({ label: 'K8s Backend', url: `${backendUrl}/healthz` });
-  }
+  // K8s Backend
+  endpoints.push({ label: 'K8s Backend', url: `https://${ns}-backend.${domain}/healthz` });
 
-  const controllerUrl = buildControllerApiUrl(config);
-  if (controllerUrl?.startsWith('https://')) {
-    endpoints.push({ label: 'Beamline Controller', url: `${controllerUrl}/api/v1/health` });
-  }
+  // Beamline Controller
+  endpoints.push({ label: 'Beamline Controller', url: `https://${ns}-beamline-controller.${domain}/api/v1/health` });
 
-  const cfUrl = buildChannelFinderUrl(config);
-  if (cfUrl?.startsWith('https://')) {
-    endpoints.push({ label: 'ChannelFinder', url: cfUrl });
+  // ChannelFinder
+  const services = config?.epicsConfiguration?.services || {};
+  const cf = services.channelfinder || {};
+  if (cf.url) {
+    endpoints.push({ label: 'ChannelFinder', url: cf.url.replace(/^http:/, 'https:') });
+  } else {
+    endpoints.push({ label: 'ChannelFinder', url: `https://${ns}-channelfinder.${domain}/ChannelFinder` });
   }
 
   // Archiver
-  const services = config?.epicsConfiguration?.services || {};
-  const ns = config?.namespace || '';
-  const domain = config?.epik8namespace || '';
   const archiver = services.archiver || {};
-  const archiverHost = archiver.host || (ns && domain ? `${ns}-archiver.${domain}` : '');
-  if (archiverHost) {
-    const archiverUrl = `https://${archiverHost}`;
-    endpoints.push({ label: 'Archiver', url: archiverUrl });
-  }
+  const archiverHost = archiver.host || `${ns}-archiver.${domain}`;
+  endpoints.push({ label: 'Archiver', url: `https://${archiverHost}` });
 
   return endpoints;
 }

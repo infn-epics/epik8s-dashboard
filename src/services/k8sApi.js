@@ -10,6 +10,8 @@
  * or can be overridden via ?backend= query param.
  */
 
+import { proxyUrl } from './devProxy.js';
+
 let _baseUrl = null;
 
 /**
@@ -18,11 +20,11 @@ let _baseUrl = null;
 export function buildBackendUrl(config) {
   const params = new URLSearchParams(window.location.search);
   const override = params.get('backend');
-  if (override) return override;
+  if (override) return proxyUrl(override);
 
   const ns = config?.namespace || '';
   const domain = config?.epik8namespace || '';
-  if (ns && domain) return `${window.location.protocol}//${ns}-backend.${domain}`;
+  if (ns && domain) return proxyUrl(`https://${ns}-backend.${domain}`);
   return null;
 }
 

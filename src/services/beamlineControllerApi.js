@@ -19,6 +19,7 @@
  */
 
 import yaml from 'js-yaml';
+import { proxyUrl } from './devProxy.js';
 
 let _configUrl = null;
 let _cachedConfig = null;
@@ -72,12 +73,12 @@ export function buildControllerConfigUrl(config) {
 export function buildControllerApiUrl(config) {
   const params = new URLSearchParams(window.location.search);
   const override = params.get('controllerApi');
-  if (override) return override;
+  if (override) return proxyUrl(override);
 
   const ns = config?.namespace;
   const domain = config?.epik8namespace;
   if (ns && domain) {
-    return `${window.location.protocol}//${ns}-beamline-controller.${domain}`;
+    return proxyUrl(`https://${ns}-beamline-controller.${domain}`);
   }
   return '';
 }

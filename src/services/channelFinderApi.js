@@ -9,6 +9,8 @@
  *   GET /resources/channels/<name>
  */
 
+import { proxyUrl } from './devProxy.js';
+
 let _baseUrl = null;
 
 /**
@@ -17,16 +19,16 @@ let _baseUrl = null;
 export function buildChannelFinderUrl(config) {
   const params = new URLSearchParams(window.location.search);
   const override = params.get('channelfinder');
-  if (override) return override;
+  if (override) return proxyUrl(override);
 
   const services = config?.epicsConfiguration?.services || {};
   const cf = services.channelfinder || {};
-  if (cf.url) return cf.url;
+  if (cf.url) return proxyUrl(cf.url);
 
   const ns = config?.namespace || '';
   const domain = config?.epik8namespace || '';
   if (ns && domain) {
-    return `${window.location.protocol}//${ns}-channelfinder.${domain}/ChannelFinder`;
+    return proxyUrl(`https://${ns}-channelfinder.${domain}/ChannelFinder`);
   }
   return null;
 }

@@ -3,6 +3,7 @@ import { loadConfig } from '../services/configLoader.js';
 import PvwsClient from '../services/pvws.js';
 import ArchiverClient from '../services/archiver.js';
 import { buildChannelFinderUrl, setChannelFinderUrl } from '../services/channelFinderApi.js';
+import { proxyUrl } from '../services/devProxy.js';
 
 const AppContext = createContext(null);
 
@@ -32,11 +33,11 @@ function buildPvwsUrl(pvwsParam, pvwsConfig) {
 function buildArchiverUrl(config) {
   const services = config?.epicsConfiguration?.services || {};
   const archiver = services.archiver || {};
-  if (archiver.host) return `${window.location.protocol}//${archiver.host}`;
+  if (archiver.host) return proxyUrl(`https://${archiver.host}`);
   // Derive from namespace/domain pattern
   const ns = config?.namespace || '';
   const domain = config?.epik8namespace || '';
-  if (ns && domain) return `${window.location.protocol}//${ns}-archiver.${domain}`;
+  if (ns && domain) return proxyUrl(`https://${ns}-archiver.${domain}`);
   return null;
 }
 
