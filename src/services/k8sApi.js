@@ -183,3 +183,52 @@ export async function checkBackendHealth() {
     return false;
   }
 }
+
+// ─── WebSocket helpers for pod log/exec/attach ──────────────────────────
+
+/**
+ * Derive the WebSocket base URL from the current backend URL.
+ * Converts http(s)://host to ws(s)://host.
+ */
+function wsBaseUrl() {
+  if (!_baseUrl) return null;
+  return _baseUrl.replace(/^http/, 'ws');
+}
+
+/**
+ * Open a streaming log WebSocket for a pod.
+ * Returns the WebSocket instance. Caller attaches onmessage/onclose handlers.
+ */
+export function streamPodLogs(podName, { container, tailLines = 200 } = {}) {
+  const base = wsBaseUrl();
+  if (!base) throw new Error('Backend URL not configured');
+  const params = new URLSearchParams();
+  if (container) params.set('container', container);
+  params.set('tailLines', String(tailLines));
+  return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/logs?${params}`);
+}
+
+/**
+ * Open an exec WebSocket for a pod (interactive shell).
+ * Returns the WebSocket instance. Send stdin via ws.send(), receive stdout via onmessage.
+ */
+export function execPod(podName, { container, cmd = '/bin/sh' } = {}) {
+  const base = wsBaseUrl();
+  if (!base) throw new Error('Backend URL not configured');
+  const params = new URLSearchParams();
+  if (container) params.set('container', container);
+  params.set('cmd', cmd);
+  return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/exec?${params}`);
+}
+
+/**
+ * Open an attach WebSocket for a pod.
+ * Returns the WebSocket instance. Send stdin via ws.send(), receive stdout via onmessage.
+ */
+export function attachPod(podName, { container } = {}) {
+  const base = wsBaseUrl();
+  if (!base) throw new Error('Backend URL not configured');
+  const params = new URLSearchParams();
+  if (container) params.set('container', container);
+  return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/attach?${params}`);
+}

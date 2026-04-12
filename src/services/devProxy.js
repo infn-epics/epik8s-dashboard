@@ -12,15 +12,23 @@
  */
 
 /**
- * If we are in dev mode and `url` points to an external HTTPS (or HTTP)
- * host, rewrite it to `/__proxy/<host>/<path>` so the Vite dev proxy
- * middleware can forward the request.
+ * If the app is being served from localhost (dev server OR `vite preview`),
+ * rewrite external URLs to `/__proxy/<host>/<path>` so the local server's
+ * proxy middleware can forward the request with CORS headers.
+ *
+ * Uses a runtime check (window.location.hostname) so it also activates in
+ * production builds served locally, not only in Vite dev mode.
  */
 export function proxyUrl(url) {
-  if (!import.meta.env.DEV || !url) return url;
+  if (!url) return url;
+  const isLocal =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1');
+  if (!isLocal) return url;
   try {
     const u = new URL(url);
-    // Don't proxy local URLs
+    // Don't proxy requests that are already local
     if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return url;
     // Rewrite to local proxy path
     return `/__proxy/${u.host}${u.pathname}${u.search}`;

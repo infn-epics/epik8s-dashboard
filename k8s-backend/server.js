@@ -22,7 +22,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { WebSocketServer } from 'ws';
-import { KubeConfig, CoreV1Api, AppsV1Api, CustomObjectsApi, Metrics } from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api, AppsV1Api, CustomObjectsApi, Metrics, Exec, Attach, Log } from '@kubernetes/client-node';
 
 // ─── Config ─────────────────────────────────────────────────────────────
 
@@ -121,10 +121,13 @@ app.use(cors({ origin: corsOrigins, credentials: true }));
 
 const server = createServer(app);
 
-// ─── WebSocket servers (chat + system events) ───────────────────────────
+// ─── WebSocket servers (chat + system events + pod log/exec/attach) ──
 
 const chatWss = new WebSocketServer({ noServer: true });
 const systemWss = new WebSocketServer({ noServer: true });
+const podLogWss = new WebSocketServer({ noServer: true });
+const podExecWss = new WebSocketServer({ noServer: true });
+const podAttachWss = new WebSocketServer({ noServer: true });
 
 // Route WS upgrade by URL path
 server.on('upgrade', (req, socket, head) => {
@@ -133,6 +136,12 @@ server.on('upgrade', (req, socket, head) => {
     chatWss.handleUpgrade(req, socket, head, ws => chatWss.emit('connection', ws, req));
   } else if (pathname === '/ws/system') {
     systemWss.handleUpgrade(req, socket, head, ws => systemWss.emit('connection', ws, req));
+  } else if (pathname.startsWith('/ws/pods/') && pathname.endsWith('/logs')) {
+    podLogWss.handleUpgrade(req, socket, head, ws => podLogWss.emit('connection', ws, req));
+  } else if (pathname.startsWith('/ws/pods/') && pathname.endsWith('/exec')) {
+    podExecWss.handleUpgrade(req, socket, head, ws => podExecWss.emit('connection', ws, req));
+  } else if (pathname.startsWith('/ws/pods/') && pathname.endsWith('/attach')) {
+    podAttachWss.handleUpgrade(req, socket, head, ws => podAttachWss.emit('connection', ws, req));
   } else {
     socket.destroy();
   }
@@ -520,6 +529,183 @@ app.get('/api/v1/nodes', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// Pod log streaming, exec, and attach via WebSocket
+// ═══════════════════════════════════════════════════════════════════════
+
+function parsePodPath(pathname) {
+  // /ws/pods/<podName>/(logs|exec|attach)
+  const m = pathname.match(/^\/ws\/pods\/([^/]+)\/(logs|exec|attach)$/);
+  return m ? { podName: decodeURIComponent(m[1]), action: m[2] } : null;
+}
+
+// --- Streaming Pod Logs ---
+podLogWss.on('connection', async (ws, req) => {
+  const { pathname, searchParams } = new URL(req.url, `http://${req.headers.host}`);
+  const parsed = parsePodPath(pathname);
+  if (!parsed) { ws.close(1008, 'Invalid pod path'); return; }
+
+  const { podName } = parsed;
+  const container = searchParams.get('container') || undefined;
+  const tailLines = parseInt(searchParams.get('tailLines') || '200', 10);
+
+  try {
+    const logStream = new Log(kc);
+    const stream = await logStream.log(NAMESPACE, podName, container, {
+      follow: true,
+      tailLines,
+      pretty: false,
+    });
+
+    stream.on('data', (chunk) => {
+      if (ws.readyState === 1) ws.send(chunk.toString());
+    });
+    stream.on('error', (err) => {
+      if (ws.readyState === 1) ws.send(`\n[log stream error: ${err.message}]\n`);
+      ws.close(1011, 'Log stream error');
+    });
+    stream.on('end', () => {
+      if (ws.readyState === 1) ws.send('\n[log stream ended]\n');
+      ws.close(1000, 'Log stream ended');
+    });
+
+    ws.on('close', () => {
+      try { stream.destroy(); } catch { /* ignore */ }
+    });
+  } catch (err) {
+    if (ws.readyState === 1) ws.send(`Error: ${err.message}`);
+    ws.close(1011, err.message);
+  }
+});
+
+// --- Pod Exec (interactive shell) ---
+podExecWss.on('connection', async (ws, req) => {
+  const { pathname, searchParams } = new URL(req.url, `http://${req.headers.host}`);
+  const parsed = parsePodPath(pathname);
+  if (!parsed) { ws.close(1008, 'Invalid pod path'); return; }
+
+  const { podName } = parsed;
+  const container = searchParams.get('container') || undefined;
+  const cmdParam = searchParams.get('cmd') || '/bin/sh';
+  const command = cmdParam.split(' ');
+
+  try {
+    const exec = new Exec(kc);
+    // Create a writable stream that sends data to the WebSocket
+    const { PassThrough } = await import('node:stream');
+    const stdinStream = new PassThrough();
+    const stdoutStream = new PassThrough();
+    const stderrStream = new PassThrough();
+
+    stdoutStream.on('data', (chunk) => {
+      if (ws.readyState === 1) ws.send(chunk.toString());
+    });
+    stderrStream.on('data', (chunk) => {
+      if (ws.readyState === 1) ws.send(chunk.toString());
+    });
+
+    ws.on('message', (data) => {
+      const msg = data.toString();
+      // Handle resize messages
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.type === 'resize') {
+          // k8s exec doesn't support resize through this API easily,
+          // but we can try setting COLUMNS/LINES env on next command
+          return;
+        }
+      } catch { /* not JSON, treat as stdin */ }
+      stdinStream.write(msg);
+    });
+
+    const execConn = await exec.exec(
+      NAMESPACE,
+      podName,
+      container,
+      command,
+      stdoutStream,
+      stderrStream,
+      stdinStream,
+      true, // tty
+    );
+
+    ws.on('close', () => {
+      try { stdinStream.destroy(); } catch { /* ignore */ }
+      try { if (execConn && execConn.close) execConn.close(); } catch { /* ignore */ }
+    });
+
+    if (execConn && execConn.on) {
+      execConn.on('close', () => {
+        if (ws.readyState === 1) ws.close(1000, 'Exec session ended');
+      });
+      execConn.on('error', (err) => {
+        if (ws.readyState === 1) ws.send(`\n[exec error: ${err.message}]\n`);
+        ws.close(1011, err.message);
+      });
+    }
+  } catch (err) {
+    if (ws.readyState === 1) ws.send(`Error: ${err.message}`);
+    ws.close(1011, err.message);
+  }
+});
+
+// --- Pod Attach ---
+podAttachWss.on('connection', async (ws, req) => {
+  const { pathname, searchParams } = new URL(req.url, `http://${req.headers.host}`);
+  const parsed = parsePodPath(pathname);
+  if (!parsed) { ws.close(1008, 'Invalid pod path'); return; }
+
+  const { podName } = parsed;
+  const container = searchParams.get('container') || undefined;
+
+  try {
+    const attach = new Attach(kc);
+    const { PassThrough } = await import('node:stream');
+    const stdinStream = new PassThrough();
+    const stdoutStream = new PassThrough();
+    const stderrStream = new PassThrough();
+
+    stdoutStream.on('data', (chunk) => {
+      if (ws.readyState === 1) ws.send(chunk.toString());
+    });
+    stderrStream.on('data', (chunk) => {
+      if (ws.readyState === 1) ws.send(chunk.toString());
+    });
+
+    ws.on('message', (data) => {
+      stdinStream.write(data.toString());
+    });
+
+    const attachConn = await attach.attach(
+      NAMESPACE,
+      podName,
+      container,
+      stdoutStream,
+      stderrStream,
+      stdinStream,
+      true, // tty
+    );
+
+    ws.on('close', () => {
+      try { stdinStream.destroy(); } catch { /* ignore */ }
+      try { if (attachConn && attachConn.close) attachConn.close(); } catch { /* ignore */ }
+    });
+
+    if (attachConn && attachConn.on) {
+      attachConn.on('close', () => {
+        if (ws.readyState === 1) ws.close(1000, 'Attach session ended');
+      });
+      attachConn.on('error', (err) => {
+        if (ws.readyState === 1) ws.send(`\n[attach error: ${err.message}]\n`);
+        ws.close(1011, err.message);
+      });
+    }
+  } catch (err) {
+    if (ws.readyState === 1) ws.send(`Error: ${err.message}`);
+    ws.close(1011, err.message);
+  }
+});
+
 // ─── Error handler ──────────────────────────────────────────────────────
 
 app.use((err, _req, res, _next) => {
@@ -534,5 +720,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`epik8s-backend listening on :${PORT}`);
   console.log(`  namespace       : ${NAMESPACE}`);
   console.log(`  argocd ns       : ${ARGOCD_NAMESPACE}`);
-  console.log(`  websocket       : /ws/chat, /ws/system`);
+  console.log(`  websocket       : /ws/chat, /ws/system, /ws/pods/:name/{logs,exec,attach}`);
 });

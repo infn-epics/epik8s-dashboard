@@ -8,9 +8,10 @@
  *   - Task configuration viewer
  *   - Wizard to create new tasks (opens TaskJobWizard)
  */
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import yaml from 'js-yaml';
 import { useApp } from '../../context/AppContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { usePv } from '../../hooks/usePv.js';
 import {
   findControllerInConfig,
@@ -35,7 +36,12 @@ import {
   removeControllerPlugin,
   generateFullConfigYaml,
   generateTaskPython,
+  DEFAULT_TASK_PATH,
 } from '../../services/beamlineControllerApi.js';
+import {
+  buildBackendUrl, setBackendUrl, getBackendUrl,
+  listPods, getPodLogs,
+} from '../../services/k8sApi.js';
 import { parseGitUrl, commitFile } from '../../services/gitApi.js';
 import TaskJobWizard from '../common/TaskJobWizard.jsx';
 import ImportTaskDialog from '../common/ImportTaskDialog.jsx';
@@ -43,6 +49,15 @@ import JobContextMenu from '../JobContextMenu.jsx';
 
 export default function BeamlineControllerView() {
   const { config, pvwsClient } = useApp();
+  const { token } = useAuth();
+
+  // Ensure k8s backend URL is set (needed for controller pod logs)
+  useEffect(() => {
+    if (!getBackendUrl() && config) {
+      const url = buildBackendUrl(config);
+      if (url) setBackendUrl(url);
+    }
+  }, [config]);
 
   // Controller info from values.yaml
   const controllerInfo = useMemo(() => findControllerInConfig(config), [config]);
@@ -194,6 +209,7 @@ export default function BeamlineControllerView() {
         controllerApiUrl={controllerApiUrl}
         configuredTaskCount={tasks.length}
         pvwsClient={pvwsClient}
+        token={token}
         onRefresh={refreshControllerService}
       />
 
@@ -271,6 +287,18 @@ export default function BeamlineControllerView() {
           setTaskSources={setTaskSources}
           controllerApiUrl={controllerApiUrl}
           defaultGitUrl={defaultGitUrl}
+          onDelete={(taskName) => {
+            const newTasks = tasks.filter((t) => t.name !== taskName);
+            setControllerConfig({ prefix, tasks: newTasks });
+            setCtrlConfig({ prefix, tasks: newTasks, raw: controllerConfig?.raw });
+            setSelectedTask(null);
+            // Clean up task sources
+            setTaskSources((prev) => {
+              const next = { ...prev };
+              delete next[taskName];
+              return next;
+            });
+          }}
         />
       )}
 
@@ -281,12 +309,28 @@ export default function BeamlineControllerView() {
           controllerApiUrl={controllerApiUrl}
           defaultGitUrl={defaultGitUrl}
           onClose={() => setShowWizard(false)}
-          onCreated={(taskDef) => {
+          onCreated={(taskDef, gitInfo) => {
             // Add to local config
             const newTasks = [...tasks, taskDef];
             const cfg = { prefix, tasks: newTasks, raw: controllerConfig?.raw };
             setControllerConfig({ prefix, tasks: newTasks });
             setCtrlConfig({ prefix, tasks: newTasks, raw: cfg.raw });
+            // Store git info + generated content in task sources
+            // so Edit > Git section is pre-populated and Commit & Push works immediately
+            setTaskSources(prev => ({
+              ...prev,
+              [taskDef.name]: {
+                ...(prev[taskDef.name] || {}),
+                configYaml: generateFullConfigYaml(taskDef, prefix),
+                pythonCode: generateTaskPython(taskDef),
+                git: gitInfo ? {
+                  url: gitInfo.url || '',
+                  branch: gitInfo.branch || 'main',
+                  path: gitInfo.path || '',
+                  pat: gitInfo.pat || '',
+                } : (prev[taskDef.name]?.git || {}),
+              },
+            }));
             setShowWizard(false);
           }}
         />
@@ -323,7 +367,7 @@ export default function BeamlineControllerView() {
   );
 }
 
-function ControllerServicePanel({ serviceState, apiUrl, controllerApiUrl, configuredTaskCount, pvwsClient, onRefresh }) {
+function ControllerServicePanel({ serviceState, apiUrl, controllerApiUrl, configuredTaskCount, pvwsClient, token, onRefresh }) {
   const taskRunningCount = (serviceState.tasks || []).filter((t) => t.running).length;
   const taskAvailableCount = (serviceState.tasks || []).filter((t) => t.status === 'available').length;
   const taskInvalidCount = (serviceState.tasks || []).filter((t) => t.status === 'invalid').length;
@@ -333,6 +377,50 @@ function ControllerServicePanel({ serviceState, apiUrl, controllerApiUrl, config
   const [selectedPlugin, setSelectedPlugin] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [pendingAction, setPendingAction] = useState('');
+
+  // Controller logs state
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsText, setLogsText] = useState('');
+  const [logsLoading, setLogsLoading] = useState(false);
+  const logsRef = useRef(null);
+
+  const fetchControllerLogs = useCallback(async () => {
+    setLogsLoading(true);
+    setLogsText('');
+    try {
+      // Find the controller pod by listing pods and matching the name
+      const podsResp = await listPods(token);
+      const pods = podsResp?.items || podsResp || [];
+      const ctrlPod = pods.find(p => {
+        const name = p.metadata?.name || '';
+        return name.includes('beamline-controller');
+      });
+      if (!ctrlPod) {
+        setLogsText('Could not find beamline-controller pod in the namespace.');
+        return;
+      }
+      const podName = ctrlPod.metadata?.name;
+      const result = await getPodLogs(podName, token, { tailLines: 500 });
+      setLogsText(typeof result === 'string' ? result : (result?.logs || JSON.stringify(result, null, 2)));
+    } catch (err) {
+      setLogsText(`Error fetching controller logs: ${err.message}`);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [token]);
+
+  const handleToggleLogs = useCallback(() => {
+    if (!logsOpen) {
+      setLogsOpen(true);
+      fetchControllerLogs();
+    } else {
+      setLogsOpen(false);
+    }
+  }, [logsOpen, fetchControllerLogs]);
+
+  useEffect(() => {
+    if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
+  }, [logsText]);
 
   useEffect(() => {
     if (!selectedPlugin) return;
@@ -460,6 +548,9 @@ function ControllerServicePanel({ serviceState, apiUrl, controllerApiUrl, config
           <span className={`bc-service-health ${healthOk ? 'ok' : 'down'}`}>
             {healthOk ? 'ONLINE' : apiUrl ? 'UNREACHABLE' : 'NOT CONFIGURED'}
           </span>
+          <button className="toolbar-btn" onClick={handleToggleLogs} title="View controller pod logs">
+            📜 Logs
+          </button>
           <button className="toolbar-btn" onClick={onRefresh} disabled={serviceState.loading}>
             {serviceState.loading ? '⏳' : '↻'} Refresh
           </button>
@@ -555,6 +646,22 @@ function ControllerServicePanel({ serviceState, apiUrl, controllerApiUrl, config
           onRemove={handleRemovePlugin}
           onClose={() => setContextMenu(null)}
         />
+      )}
+
+      {/* Controller pod logs drawer */}
+      {logsOpen && (
+        <div className="bc-logs-drawer">
+          <div className="k8s-logs-header">
+            <span>📜 Controller Logs</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="widget-btn" onClick={fetchControllerLogs} title="Refresh logs">↻</button>
+              <button className="widget-btn" onClick={() => setLogsOpen(false)}>✕</button>
+            </div>
+          </div>
+          <pre className="k8s-logs-body" ref={logsRef}>
+            {logsLoading ? '⟳ Loading logs…' : logsText || '(no output)'}
+          </pre>
+        </div>
       )}
 
       {serviceState.updatedAt && (
@@ -966,11 +1073,12 @@ function TaskCard({ task, prefix, pvwsClient, selected, onSelect }) {
    TaskDetailPanel — expanded view with all PVs
    ──────────────────────────────────────────── */
 
-function TaskDetailPanel({ task, prefix, pvwsClient, taskSources, setTaskSources, controllerApiUrl, defaultGitUrl }) {
+function TaskDetailPanel({ task, prefix, pvwsClient, taskSources, setTaskSources, controllerApiUrl, defaultGitUrl, onDelete }) {
   const [activeAction, setActiveAction] = useState(null);
   const [editTab, setEditTab] = useState('yaml');
   const [gitStatus, setGitStatus] = useState(null);
   const [deployStatus, setDeployStatus] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!task) return null;
 
@@ -990,6 +1098,16 @@ function TaskDetailPanel({ task, prefix, pvwsClient, taskSources, setTaskSources
         <button className={`bc-action-btn ${activeAction === 'edit' ? 'active' : ''}`} onClick={() => { setActiveAction(a => a === 'edit' ? null : 'edit'); setGitStatus(null); setDeployStatus(null); }}>✏ Edit</button>
         <button className={`bc-action-btn ${activeAction === 'git' ? 'active' : ''}`} onClick={() => { setActiveAction(a => a === 'git' ? null : 'git'); setGitStatus(null); setDeployStatus(null); }}>🔗 Git</button>
         <button className={`bc-action-btn ${activeAction === 'deploy' ? 'active' : ''}`} onClick={() => { setActiveAction(a => a === 'deploy' ? null : 'deploy'); setGitStatus(null); setDeployStatus(null); }}>🚀 Deploy</button>
+        <span style={{ flex: 1 }} />
+        {!confirmDelete ? (
+          <button className="bc-action-btn bc-action-btn--danger" onClick={() => setConfirmDelete(true)} title="Remove task from configuration">🗑 Remove</button>
+        ) : (
+          <span className="bc-confirm-delete">
+            Remove <strong>{task.displayName || task.name}</strong>?
+            <button className="bc-action-btn bc-action-btn--danger" onClick={() => { onDelete?.(task.name); setConfirmDelete(false); }}>Yes, remove</button>
+            <button className="bc-action-btn" onClick={() => setConfirmDelete(false)}>Cancel</button>
+          </span>
+        )}
       </div>
 
       {/* Editor Section */}
@@ -1004,7 +1122,7 @@ function TaskDetailPanel({ task, prefix, pvwsClient, taskSources, setTaskSources
 
       {/* Deploy Section */}
       {activeAction === 'deploy' && (
-        <TaskDeploySection task={task} taskSources={taskSources} controllerApiUrl={controllerApiUrl} deployStatus={deployStatus} setDeployStatus={setDeployStatus} />
+        <TaskDeploySection task={task} taskSources={taskSources} controllerApiUrl={controllerApiUrl} defaultGitUrl={defaultGitUrl} deployStatus={deployStatus} setDeployStatus={setDeployStatus} />
       )}
 
       {/* Parameters */}
@@ -1213,9 +1331,14 @@ function TaskEditorSection({ task, prefix, editTab, setEditTab, taskSources, set
    Task Git Section — commit & push to git repo
    ──────────────────────────────────────────── */
 
-function TaskGitSection({ task, taskSources, setTaskSources, gitStatus, setGitStatus }) {
+function TaskGitSection({ task, taskSources, setTaskSources, defaultGitUrl, gitStatus, setGitStatus }) {
   const sources = taskSources?.[task.name] || {};
   const git = sources.git || {};
+
+  // Auto-populate git fields from defaults when empty
+  const effectiveUrl = git.url || defaultGitUrl || '';
+  const effectivePath = git.path || `${DEFAULT_TASK_PATH}/${task.module}`;
+  const effectiveBranch = git.branch || 'main';
 
   const updateGit = (field, value) => {
     setTaskSources?.(prev => ({
@@ -1228,11 +1351,11 @@ function TaskGitSection({ task, taskSources, setTaskSources, gitStatus, setGitSt
   };
 
   const handleCommitPush = async () => {
-    if (!git.url || !git.pat) { setGitStatus('❌ Git URL and PAT are required'); return; }
-    const repoInfo = parseGitUrl(git.url);
+    if (!effectiveUrl || !git.pat) { setGitStatus('❌ Git URL and PAT are required'); return; }
+    const repoInfo = parseGitUrl(effectiveUrl);
     if (!repoInfo) { setGitStatus('❌ Invalid git URL'); return; }
-    const branch = git.branch || 'main';
-    const basePath = git.path || `config/iocs/beamline-controller/${task.module}`;
+    const branch = effectiveBranch;
+    const basePath = effectivePath;
     setGitStatus('⏳ Committing...');
     try {
       if (sources.configYaml) {
@@ -1251,16 +1374,16 @@ function TaskGitSection({ task, taskSources, setTaskSources, gitStatus, setGitSt
     <div className="bc-git-section">
       <div className="bc-git-field">
         <label>Git URL</label>
-        <input type="text" value={git.url || ''} onChange={(e) => updateGit('url', e.target.value)} placeholder="https://gitlab.infn.it/org/beamline-project.git" />
+        <input type="text" value={effectiveUrl} onChange={(e) => updateGit('url', e.target.value)} placeholder="https://gitlab.infn.it/org/beamline-project.git" />
       </div>
       <div className="bc-git-row">
         <div className="bc-git-field">
           <label>Branch</label>
-          <input type="text" value={git.branch || ''} onChange={(e) => updateGit('branch', e.target.value)} placeholder="main" />
+          <input type="text" value={effectiveBranch} onChange={(e) => updateGit('branch', e.target.value)} placeholder="main" />
         </div>
         <div className="bc-git-field">
           <label>Path in repo</label>
-          <input type="text" value={git.path || ''} onChange={(e) => updateGit('path', e.target.value)} placeholder={`config/iocs/beamline-controller/${task.module}`} />
+          <input type="text" value={effectivePath} onChange={(e) => updateGit('path', e.target.value)} placeholder={`config/iocs/beamline-controller/${task.module}`} />
         </div>
         <div className="bc-git-field">
           <label>PAT</label>
@@ -1268,7 +1391,7 @@ function TaskGitSection({ task, taskSources, setTaskSources, gitStatus, setGitSt
         </div>
       </div>
       <div className="bc-git-actions">
-        <button className="toolbar-btn active" onClick={handleCommitPush} disabled={!git.url || !git.pat || (!sources.configYaml && !sources.pythonCode)}>📤 Commit & Push</button>
+        <button className="toolbar-btn active" onClick={handleCommitPush} disabled={!effectiveUrl || !git.pat || (!sources.configYaml && !sources.pythonCode)}>📤 Commit & Push</button>
         {!sources.configYaml && !sources.pythonCode && <span className="bc-git-hint">Edit config or Python first to enable commit</span>}
       </div>
       {gitStatus && <div className={`bc-status-msg ${gitStatus.startsWith('✅') ? 'bc-status--ok' : gitStatus.startsWith('❌') ? 'bc-status--error' : ''}`}>{gitStatus}</div>}
@@ -1280,18 +1403,20 @@ function TaskGitSection({ task, taskSources, setTaskSources, gitStatus, setGitSt
    Task Deploy Section — deploy / restart via controller API
    ──────────────────────────────────────────── */
 
-function TaskDeploySection({ task, taskSources, controllerApiUrl, deployStatus, setDeployStatus }) {
+function TaskDeploySection({ task, taskSources, controllerApiUrl, defaultGitUrl, deployStatus, setDeployStatus }) {
   const git = taskSources?.[task.name]?.git || {};
+  const effectiveUrl = git.url || defaultGitUrl || '';
+  const effectivePath = git.path || `${DEFAULT_TASK_PATH}/${task.module}`;
 
   const handleDeploy = async () => {
     if (!controllerApiUrl) { setDeployStatus('❌ Set Controller API URL in ⚙ Config panel'); return; }
-    if (!git.url) { setDeployStatus('❌ Configure Git URL in 🔗 Git section first'); return; }
+    if (!effectiveUrl) { setDeployStatus('❌ Configure Git URL in 🔗 Git section first'); return; }
     setDeployStatus('⏳ Deploying...');
     try {
       const result = await deployPlugin(controllerApiUrl, {
         name: task.module,
-        git_url: git.url,
-        path: git.path || '',
+        git_url: effectiveUrl,
+        path: effectivePath,
         pat: git.pat || undefined,
         branch: git.branch || 'main',
       });
@@ -1319,7 +1444,7 @@ function TaskDeploySection({ task, taskSources, controllerApiUrl, deployStatus, 
         {!controllerApiUrl && <><br /><strong>⚠ Set Controller API URL in ⚙ Config panel first.</strong></>}
       </p>
       <div className="bc-deploy-actions">
-        <button className="toolbar-btn active" onClick={handleDeploy} disabled={!controllerApiUrl || !git.url}>🚀 Deploy</button>
+        <button className="toolbar-btn active" onClick={handleDeploy} disabled={!controllerApiUrl || !effectiveUrl}>🚀 Deploy</button>
         <button className="toolbar-btn" onClick={handleRestart} disabled={!controllerApiUrl}>🔄 Restart</button>
       </div>
       {deployStatus && <div className={`bc-status-msg ${deployStatus.startsWith('✅') ? 'bc-status--ok' : deployStatus.startsWith('❌') ? 'bc-status--error' : ''}`}>{deployStatus}</div>}
@@ -1338,12 +1463,14 @@ function RunFromGitDialog({ controllerApiUrl, defaultGitUrl, onClose, onDeployed
   const [gitBranch, setGitBranch] = useState('main');
   const [gitPat, setGitPat] = useState('');
   const [status, setStatus] = useState(null);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   const handleDeploy = async () => {
     if (!name.trim()) { setStatus('❌ Plugin name is required'); return; }
     if (!gitUrl.trim()) { setStatus('❌ Git URL is required'); return; }
     if (!controllerApiUrl) { setStatus('❌ Controller API URL not set — configure in ⚙ Config panel'); return; }
     setStatus('⏳ Deploying...');
+    setValidationErrors([]);
     try {
       const result = await deployPlugin(controllerApiUrl, {
         name: name.trim(),
@@ -1352,10 +1479,16 @@ function RunFromGitDialog({ controllerApiUrl, defaultGitUrl, onClose, onDeployed
         pat: gitPat.trim() || undefined,
         branch: gitBranch.trim() || 'main',
       });
+      if (result.validation?.errors?.length) {
+        setValidationErrors(result.validation.errors);
+      }
       setStatus(`✅ ${result.message || 'Deployed successfully'}`);
       onDeployed?.(result);
     } catch (e) {
       setStatus(`❌ ${e.message}`);
+      if (e.validation?.errors?.length) {
+        setValidationErrors(e.validation.errors);
+      }
     }
   };
 
@@ -1394,6 +1527,16 @@ function RunFromGitDialog({ controllerApiUrl, defaultGitUrl, onClose, onDeployed
             </div>
           </div>
           {status && <div className={`bc-status-msg ${status.startsWith('✅') ? 'bc-status--ok' : status.startsWith('❌') ? 'bc-status--error' : ''}`}>{status}</div>}
+          {validationErrors.length > 0 && (
+            <div className="bc-detail-section" style={{ marginTop: 8 }}>
+              <h4>Validation Errors</h4>
+              <div className="bc-service-validation-list">
+                {validationErrors.map((err, idx) => (
+                  <div key={`deploy-val-${idx}`} className="bc-service-validation-item">{err}</div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="import-dialog-footer">
           <button className="toolbar-btn" onClick={onClose}>Cancel</button>

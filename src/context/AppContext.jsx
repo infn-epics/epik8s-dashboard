@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { loadConfig } from '../services/configLoader.js';
+import { loadConfig, loadStoredGitConfig, saveGitConfig, clearGitConfig } from '../services/configLoader.js';
 import PvwsClient from '../services/pvws.js';
 import ArchiverClient from '../services/archiver.js';
 import { buildChannelFinderUrl, setChannelFinderUrl } from '../services/channelFinderApi.js';
@@ -59,9 +59,18 @@ export function AppProvider({ children }) {
     const archiverParam = params.get('archiver') || '';
     const valuesPath = params.get('values') || '/values.yaml';
 
+    // Git URL can come from: ?giturl= param → localStorage → values.yaml itself
+    const stored = loadStoredGitConfig();
+    const giturl   = params.get('giturl')    || stored.giturl   || '';
+    const gitbranch = params.get('gitbranch') || stored.gitbranch || 'main';
+    const gittoken  = params.get('gittoken')  || stored.token    || '';
+
+    // Persist to localStorage if coming from query params
+    if (params.get('giturl'))    saveGitConfig(giturl, gitbranch, gittoken);
+
     let cancelled = false;
 
-    loadConfig(valuesPath)
+    loadConfig(valuesPath, { giturl, gitbranch, token: gittoken || null })
       .then((result) => {
         if (cancelled) return;
         setConfig(result.config);
@@ -130,6 +139,20 @@ export function AppProvider({ children }) {
     updateDataSources(dataSources.pvwsDefault, dataSources.archiverDefault);
   }, [dataSources.pvwsDefault, dataSources.archiverDefault, updateDataSources]);
 
+  /** Save a new git config and reload the page to re-bootstrap from the new URL. */
+  const updateGitConfig = useCallback((giturl, gitbranch, token) => {
+    saveGitConfig(giturl, gitbranch, token);
+    window.location.reload();
+  }, []);
+
+  /** Remove stored git config and reload (falls back to local values.yaml). */
+  const resetGitConfig = useCallback(() => {
+    clearGitConfig();
+    window.location.reload();
+  }, []);
+
+  const storedGit = loadStoredGitConfig();
+
   const value = {
     config,
     devices,
@@ -142,6 +165,13 @@ export function AppProvider({ children }) {
     dataSources,
     updateDataSources,
     resetDataSources,
+    // Git bootstrap config (for Settings UI)
+    gitConfig: {
+      giturl:    storedGit.giturl    || config?._giturl    || '',
+      gitbranch: storedGit.gitbranch || config?._gitbranch || 'main',
+    },
+    updateGitConfig,
+    resetGitConfig,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

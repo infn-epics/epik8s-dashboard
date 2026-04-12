@@ -7,11 +7,12 @@ import { ROLES } from '../../services/auth.js';
  * SettingsView — Application settings page.
  *
  * Sections:
+ *  - Beamline Repository: git URL as primary entry point
  *  - DataSources: PVWS and Archiver URL management
  *  - Authentication: PAT configuration for GitHub/GitLab
  */
 export default function SettingsView() {
-  const { dataSources, updateDataSources, resetDataSources } = useApp();
+  const { dataSources, updateDataSources, resetDataSources, gitConfig, updateGitConfig, resetGitConfig } = useApp();
   const {
     user, provider, role, isAuthenticated, repoInfo,
     login, logout, authError, authLoading,
@@ -20,6 +21,11 @@ export default function SettingsView() {
   const [pvwsUrl, setPvwsUrl] = useState(dataSources.pvwsUrl);
   const [archiverUrl, setArchiverUrl] = useState(dataSources.archiverUrl);
   const [saved, setSaved] = useState(false);
+
+  // Git URL config
+  const [giturl, setGiturl] = useState(gitConfig?.giturl || '');
+  const [gitbranch, setGitbranch] = useState(gitConfig?.gitbranch || 'main');
+  const [gitSaved, setGitSaved] = useState(false);
 
   // PAT input
   const [patInput, setPatInput] = useState('');
@@ -45,9 +51,72 @@ export default function SettingsView() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleGitSave = () => {
+    if (!giturl.trim()) return;
+    updateGitConfig(giturl.trim(), gitbranch.trim() || 'main', null);
+    setGitSaved(true); // page reloads so this is just a visual flash
+  };
+
+  const handleGitReset = () => {
+    resetGitConfig();
+    // page also reloads
+  };
+
   return (
     <div className="settings-view">
       <h2 className="settings-heading">⚙ Settings</h2>
+
+      {/* Beamline Repository */}
+      <section className="settings-section">
+        <h3 className="settings-section-title">🦊 Beamline Repository</h3>
+        <p className="settings-section-desc">
+          Set the beamline git repository URL as the primary configuration source.
+          The dashboard will load <code>values.yaml</code> (and all <code>deploy/values-*.yaml</code>)
+          directly from git. Leave blank to fall back to the local <code>/values.yaml</code>.
+        </p>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="git-url">Repository URL</label>
+          <input
+            id="git-url"
+            className="settings-input"
+            type="text"
+            value={giturl}
+            onChange={(e) => setGiturl(e.target.value)}
+            placeholder="https://gitlab.example.com/beamline/epik8-mybeamline.git"
+          />
+          <span className="settings-hint">
+            Supports https://github.com/… and https://gitlab.../… URLs.
+            Public repos work without a token; private repos require the PAT below.
+          </span>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="git-branch">Branch</label>
+          <input
+            id="git-branch"
+            className="settings-input"
+            type="text"
+            value={gitbranch}
+            onChange={(e) => setGitbranch(e.target.value)}
+            placeholder="main"
+            style={{ maxWidth: 180 }}
+          />
+        </div>
+        <div className="settings-actions">
+          <button
+            className="settings-btn settings-btn--primary"
+            onClick={handleGitSave}
+            disabled={!giturl.trim()}
+          >
+            Save &amp; Reload
+          </button>
+          {gitConfig?.giturl && (
+            <button className="settings-btn" onClick={handleGitReset}>
+              Clear (use local values.yaml)
+            </button>
+          )}
+          {gitSaved && <span className="settings-saved">Reloading…</span>}
+        </div>
+      </section>
 
       {/* DataSources Section */}
       <section className="settings-section">

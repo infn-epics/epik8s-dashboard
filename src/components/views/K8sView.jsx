@@ -13,6 +13,7 @@ import {
   scaleDeployment, restartDeployment, deleteDeployment,
   scaleStatefulSet, restartStatefulSet, deleteStatefulSet,
   listNodes,
+  streamPodLogs, execPod, attachPod,
 } from '../../services/k8sApi.js';
 
 const TABS = [
@@ -41,7 +42,16 @@ export default function K8sView() {
   const [logsOpen, setLogsOpen] = useState(null); // pod name
   const [logsText, setLogsText] = useState('');
   const [logsLoading, setLogsLoading] = useState(false);
+  const [logsStreaming, setLogsStreaming] = useState(false);
   const logsRef = useRef(null);
+  const logsWsRef = useRef(null);
+
+  // Pod exec / attach terminal
+  const [termOpen, setTermOpen] = useState(null); // { podName, mode: 'exec'|'attach' }
+  const [termText, setTermText] = useState('');
+  const [termInput, setTermInput] = useState('');
+  const termWsRef = useRef(null);
+  const termRef = useRef(null);
 
   // Scale dialog
   const [scaleTarget, setScaleTarget] = useState(null); // { name, kind }
@@ -176,12 +186,34 @@ export default function K8sView() {
   };
 
   const handleLogs = async (podName) => {
+    // Close any existing stream
+    if (logsWsRef.current) {
+      logsWsRef.current.close();
+      logsWsRef.current = null;
+    }
     setLogsOpen(podName);
     setLogsLoading(true);
     setLogsText('');
+    setLogsStreaming(false);
     try {
+      // First fetch existing logs as one-shot
       const result = await getPodLogs(podName, token, { tailLines: 500 });
-      setLogsText(typeof result === 'string' ? result : (result?.logs || JSON.stringify(result, null, 2)));
+      const initial = typeof result === 'string' ? result : (result?.logs || JSON.stringify(result, null, 2));
+      setLogsText(initial);
+
+      // Then open streaming WebSocket for follow
+      try {
+        const ws = streamPodLogs(podName, { tailLines: 0 });
+        logsWsRef.current = ws;
+        ws.onopen = () => setLogsStreaming(true);
+        ws.onmessage = (e) => {
+          setLogsText(prev => prev + e.data);
+        };
+        ws.onclose = () => setLogsStreaming(false);
+        ws.onerror = () => setLogsStreaming(false);
+      } catch {
+        // Streaming not available, that's ok — we have the one-shot data
+      }
     } catch (err) {
       setLogsText(`Error fetching logs: ${err.message}`);
     } finally {
@@ -189,9 +221,95 @@ export default function K8sView() {
     }
   };
 
+  const closeLogs = () => {
+    if (logsWsRef.current) {
+      logsWsRef.current.close();
+      logsWsRef.current = null;
+    }
+    setLogsOpen(null);
+    setLogsStreaming(false);
+  };
+
+  const handleExec = (podName) => {
+    // Close any existing terminal
+    if (termWsRef.current) {
+      termWsRef.current.close();
+      termWsRef.current = null;
+    }
+    setTermOpen({ podName, mode: 'exec' });
+    setTermText('');
+    setTermInput('');
+    try {
+      const ws = execPod(podName);
+      termWsRef.current = ws;
+      ws.onmessage = (e) => {
+        setTermText(prev => prev + e.data);
+      };
+      ws.onclose = () => {
+        setTermText(prev => prev + '\n[session ended]\n');
+      };
+      ws.onerror = (err) => {
+        setTermText(prev => prev + '\n[connection error]\n');
+      };
+    } catch (err) {
+      setTermText(`Error: ${err.message}`);
+    }
+  };
+
+  const handleAttach = (podName) => {
+    if (termWsRef.current) {
+      termWsRef.current.close();
+      termWsRef.current = null;
+    }
+    setTermOpen({ podName, mode: 'attach' });
+    setTermText('');
+    setTermInput('');
+    try {
+      const ws = attachPod(podName);
+      termWsRef.current = ws;
+      ws.onmessage = (e) => {
+        setTermText(prev => prev + e.data);
+      };
+      ws.onclose = () => {
+        setTermText(prev => prev + '\n[session ended]\n');
+      };
+      ws.onerror = () => {
+        setTermText(prev => prev + '\n[connection error]\n');
+      };
+    } catch (err) {
+      setTermText(`Error: ${err.message}`);
+    }
+  };
+
+  const closeTerm = () => {
+    if (termWsRef.current) {
+      termWsRef.current.close();
+      termWsRef.current = null;
+    }
+    setTermOpen(null);
+  };
+
+  const sendTermInput = () => {
+    if (!termInput || !termWsRef.current || termWsRef.current.readyState !== 1) return;
+    termWsRef.current.send(termInput + '\n');
+    setTermInput('');
+  };
+
   useEffect(() => {
     if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
   }, [logsText]);
+
+  useEffect(() => {
+    if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
+  }, [termText]);
+
+  // Clean up WebSockets on unmount
+  useEffect(() => {
+    return () => {
+      if (logsWsRef.current) logsWsRef.current.close();
+      if (termWsRef.current) termWsRef.current.close();
+    };
+  }, []);
 
   /* ── Helpers ────────────────────────────── */
   const data = dataCache[tab] ?? null;
@@ -266,7 +384,7 @@ export default function K8sView() {
         ) : tab === 'apps' ? (
           <AppsTable items={items} search={search} onSync={handleSync} onRestart={handleRestart} onDelete={handleDeleteApplication} healthBadge={healthBadge} />
         ) : tab === 'pods' ? (
-          <PodsTable items={items} search={search} onLogs={handleLogs} onDelete={handleDeletePod} healthBadge={healthBadge} />
+          <PodsTable items={items} search={search} onLogs={handleLogs} onExec={handleExec} onAttach={handleAttach} onDelete={handleDeletePod} healthBadge={healthBadge} />
         ) : tab === 'services' ? (
           <ServicesTable items={items} search={search} />
         ) : tab === 'deployments' ? (
@@ -292,12 +410,37 @@ export default function K8sView() {
       {logsOpen && (
         <div className="k8s-logs-drawer">
           <div className="k8s-logs-header">
-            <span>📜 Logs — {logsOpen}</span>
-            <button className="widget-btn" onClick={() => setLogsOpen(null)}>✕</button>
+            <span>📜 Logs — {logsOpen} {logsStreaming && <span className="k8s-stream-badge">● streaming</span>}</span>
+            <button className="widget-btn" onClick={closeLogs}>✕</button>
           </div>
           <pre className="k8s-logs-body" ref={logsRef}>
             {logsLoading ? '⟳ Loading logs…' : logsText || '(no output)'}
           </pre>
+        </div>
+      )}
+
+      {/* Exec / Attach terminal drawer */}
+      {termOpen && (
+        <div className="k8s-logs-drawer k8s-term-drawer">
+          <div className="k8s-logs-header">
+            <span>{termOpen.mode === 'exec' ? '💻 Exec' : '🔗 Attach'} — {termOpen.podName}</span>
+            <button className="widget-btn" onClick={closeTerm}>✕</button>
+          </div>
+          <pre className="k8s-logs-body k8s-term-body" ref={termRef}>
+            {termText || '(connecting…)'}
+          </pre>
+          <div className="k8s-term-input-bar">
+            <input
+              className="k8s-term-input"
+              type="text"
+              value={termInput}
+              onChange={e => setTermInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') sendTermInput(); }}
+              placeholder="Type command and press Enter…"
+              autoFocus
+            />
+            <button className="bl-btn bl-btn--xs" onClick={sendTermInput}>⏎</button>
+          </div>
         </div>
       )}
 
@@ -461,7 +604,7 @@ function AppsTable({ items, search, onSync, onRestart, onDelete, healthBadge }) 
   );
 }
 
-function PodsTable({ items, search, onLogs, onDelete, healthBadge }) {
+function PodsTable({ items, search, onLogs, onExec, onAttach, onDelete, healthBadge }) {
   const { sortCol, sortDir, toggle } = useSortable('name');
   const getName = (pod) => pod.metadata?.name || pod.name || '';
   const getter = (pod, col) => {
@@ -516,6 +659,8 @@ function PodsTable({ items, search, onLogs, onDelete, healthBadge }) {
               <td>{started ? new Date(started).toLocaleString() : ''}</td>
               <td className="k8s-cell-actions">
                 <button className="bl-btn bl-btn--xs" onClick={() => onLogs(name)} title="View Logs">📜</button>
+                <button className="bl-btn bl-btn--xs" onClick={() => onExec(name)} title="Exec Shell">💻</button>
+                <button className="bl-btn bl-btn--xs" onClick={() => onAttach(name)} title="Attach">🔗</button>
                 <button className="bl-btn bl-btn--xs bl-btn--danger" onClick={() => onDelete(name)} title="Delete">🗑</button>
               </td>
             </tr>

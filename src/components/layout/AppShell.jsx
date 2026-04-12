@@ -84,12 +84,12 @@ export default function AppShell({ children, theme, onToggleTheme }) {
     {
       label: 'Controls',
       icon: '🎛',
-      paths: ['/dashboard', '/beamline', '/layout', '/controller'],
+      paths: ['/dashboard', '/beamline', '/layout', '/softioc'],
       items: [
         { to: '/dashboard',   icon: '📊', label: 'Dashboards' },
         { to: '/beamline',    icon: '🔬', label: 'Beamline' },
         { to: '/layout',      icon: '🗺', label: 'Layout' },
-        { to: '/controller',  icon: '🎛', label: 'Controller' },
+        { to: '/softioc',     icon: '🧩', label: 'SoftIOC' },
       ],
     },
     {

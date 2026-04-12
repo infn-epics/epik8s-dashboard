@@ -6,7 +6,7 @@
  *   2. Parameters — key-value pairs with types
  *   3. Inputs — PV definitions (name, type, desc, unit)
  *   4. Outputs — PV definitions (name, type, desc, unit)
- *   5. Preview & Download — YAML config + Python skeleton
+ *   5. Preview & Save — YAML config + Python skeleton
  */
 import { useState, useCallback, useRef } from 'react';
 import {
@@ -15,18 +15,23 @@ import {
   generateTaskYaml,
   generateFullConfigYaml,
   generateRequirementsTxt,
+  generateStartSh,
   generateTaskZip,
   getDefaultTaskPath,
   DEFAULT_TASK_PATH,
   deployPlugin,
+  generateSoftIocEntry,
+  mergeSoftIocValues,
+  SOFTIOC_VALUES_PATH,
 } from '../../services/beamlineControllerApi.js';
+import { parseGitUrl, commitFiles, getFile, commitFile } from '../../services/gitApi.js';
 
 const STEPS = [
   { key: 'basic', label: '1. Basic Info' },
   { key: 'params', label: '2. Parameters' },
   { key: 'inputs', label: '3. Inputs' },
   { key: 'outputs', label: '4. Outputs' },
-  { key: 'preview', label: '5. Preview & Download' },
+  { key: 'preview', label: '5. Preview & Save' },
 ];
 
 const PV_TYPES = Object.keys(PV_TYPE_MAP);
@@ -48,6 +53,12 @@ export default function TaskJobWizard({ prefix, controllerApiUrl, defaultGitUrl,
 
   // Step 4: Outputs
   const [outputs, setOutputs] = useState([]);
+
+  // Git info (lifted from StepPreview so we can pass it back with onCreated)
+  const [wizGitUrl, setWizGitUrl] = useState(defaultGitUrl || '');
+  const [wizGitBranch, setWizGitBranch] = useState('main');
+  const [wizGitPat, setWizGitPat] = useState('');
+  const [wizProjectPath, setWizProjectPath] = useState('');
 
   // Validation
   const [validationError, setValidationError] = useState('');
@@ -208,7 +219,14 @@ export default function TaskJobWizard({ prefix, controllerApiUrl, defaultGitUrl,
 
   const handleCreate = () => {
     const taskDef = buildTaskDef();
-    onCreated?.(taskDef);
+    const effectivePath = wizProjectPath || `${DEFAULT_TASK_PATH}/${taskDef.module || taskDef.name || 'my_task'}`;
+    const gitInfo = {
+      url: wizGitUrl || '',
+      branch: wizGitBranch || 'main',
+      path: effectivePath,
+      pat: wizGitPat || '',
+    };
+    onCreated?.(taskDef, gitInfo);
   };
 
   // Render the active step content
@@ -229,6 +247,14 @@ export default function TaskJobWizard({ prefix, controllerApiUrl, defaultGitUrl,
             prefix={prefix}
             controllerApiUrl={controllerApiUrl}
             defaultGitUrl={defaultGitUrl}
+            gitUrl={wizGitUrl}
+            setGitUrl={setWizGitUrl}
+            gitBranch={wizGitBranch}
+            setGitBranch={setWizGitBranch}
+            gitPat={wizGitPat}
+            setGitPat={setWizGitPat}
+            projectPath={wizProjectPath}
+            setProjectPath={setWizProjectPath}
             onDownloadPython={handleDownloadPython}
             onDownloadYaml={handleDownloadYaml}
             onDownloadReqs={handleDownloadRequirements}
@@ -534,29 +560,102 @@ function StepPvDefs({ items, setItems, label }) {
   );
 }
 
-/* ── Step 5: Preview & Download ── */
+/* ── Step 5: Preview & Save ── */
 
-function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDownloadYaml, onDownloadReqs, onDownloadZip }) {
+function StepPreview({ taskDef, prefix, controllerApiUrl, defaultGitUrl, gitUrl, setGitUrl, gitBranch, setGitBranch, gitPat, setGitPat, projectPath: liftedPath, setProjectPath: setLiftedPath, onDownloadPython, onDownloadYaml, onDownloadReqs, onDownloadZip }) {
   const [activeTab, setActiveTab] = useState('python');
-  const [projectPath, setProjectPath] = useState(DEFAULT_TASK_PATH);
-  const [gitUrl, setGitUrl] = useState(defaultGitUrl || '');
-  const [gitBranch, setGitBranch] = useState('main');
-  const [gitPat, setGitPat] = useState('');
+  const defaultPath = `${DEFAULT_TASK_PATH}/${taskDef.module || taskDef.name || 'my_task'}`;
+  const projectPath = liftedPath || defaultPath;
+  const setProjectPath = (v) => setLiftedPath(v);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [deployStatus, setDeployStatus] = useState(null);
+  const [gitCommitStatus, setGitCommitStatus] = useState(null);
+  const [committing, setCommitting] = useState(false);
+  const [registerArgo, setRegisterArgo] = useState(true);
+  const gitStatusRef = useRef(null);
 
   const pythonCode = generateTaskPython(taskDef);
   const yamlConfig = generateFullConfigYaml(taskDef, prefix);
   const reqs = generateRequirementsTxt();
-  const taskPath = `${projectPath}/${taskDef.module}`;
+  const startSh = generateStartSh(taskDef.module || taskDef.name || 'task');
 
   const handleDownloadProjectZip = () => onDownloadZip(projectPath);
   const handleDownloadFlatZip = () => onDownloadZip(null);
 
-  // Build a git clone + copy command for the user
-  const gitCloneCmd = gitUrl
-    ? `git clone${gitBranch !== 'main' ? ` -b ${gitBranch}` : ''} ${gitUrl} beamline-project\nmkdir -p beamline-project/${taskPath}\ncp ${taskDef.module}.py config.yaml requirements.txt beamline-project/${taskPath}/\ncd beamline-project && git add . && git commit -m "Add task ${taskDef.name}" && git push`
-    : '';
+  const scrollToStatus = () => {
+    setTimeout(() => {
+      gitStatusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  };
+
+  const handleAddToRepo = async () => {
+    if (!gitUrl.trim()) { setGitCommitStatus('❌ Git URL is required'); scrollToStatus(); return; }
+    if (!gitPat.trim()) { setGitCommitStatus('❌ PAT is required to push files'); scrollToStatus(); return; }
+    const repoInfo = parseGitUrl(gitUrl.trim());
+    if (!repoInfo) { setGitCommitStatus('❌ Could not parse Git URL — use https://host/org/repo.git or git@host:org/repo.git'); scrollToStatus(); return; }
+
+    const dir = projectPath.replace(/\/+$/, '');
+    const moduleName = taskDef.module || taskDef.name || 'task';
+    const files = [
+      { path: `${dir}/${moduleName}.py`, content: pythonCode },
+      { path: `${dir}/config.yaml`, content: yamlConfig },
+      { path: `${dir}/requirements.txt`, content: reqs },
+      { path: `${dir}/start.sh`, content: startSh },
+    ];
+
+    setCommitting(true);
+    setGitCommitStatus(`⏳ Committing ${files.length} files to ${repoInfo.projectPath}…`);
+    scrollToStatus();
+    try {
+      // Step 1: Commit task files (Python, config.yaml, requirements.txt, start.sh)
+      const result = await commitFiles(repoInfo, files, gitBranch || 'main', `Add soft IOC task ${taskDef.name}`, gitPat.trim());
+
+      // Step 2: Register as ArgoCD application in values-softiocs.yaml
+      if (registerArgo) {
+        setGitCommitStatus('⏳ Registering soft IOC in ArgoCD values…');
+        scrollToStatus();
+
+        // Read existing values-softiocs.yaml (or start fresh)
+        let existingYaml = '';
+        try {
+          const existing = await getFile(repoInfo, SOFTIOC_VALUES_PATH, gitBranch || 'main', gitPat.trim());
+          existingYaml = existing.content;
+        } catch {
+          // File doesn't exist yet — will create
+        }
+
+        const entry = generateSoftIocEntry(taskDef, dir, prefix);
+        const newYaml = mergeSoftIocValues(existingYaml, entry);
+
+        await commitFile(
+          repoInfo,
+          SOFTIOC_VALUES_PATH,
+          gitBranch || 'main',
+          newYaml,
+          `Register soft IOC "${taskDef.name}" in ArgoCD values`,
+          gitPat.trim(),
+        );
+      }
+
+      const commitId = result?.id?.substring(0, 8) || result?.content?.sha?.substring(0, 8) || '';
+      setGitCommitStatus(
+        `✅ Committed ${files.length} files to ${dir}/` +
+        (commitId ? ` (${commitId})` : '') +
+        (registerArgo ? ' — registered as ArgoCD soft IOC application' : ''),
+      );
+    } catch (e) {
+      console.error('[Add to Beamline Repo]', e);
+      const msg = e.message || String(e);
+      if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('CORS')) {
+        setGitCommitStatus('❌ Network error — the Git server may block browser requests (CORS). Try using the Download ZIP option instead, or check that your PAT is valid.');
+      } else {
+        setGitCommitStatus(`❌ ${msg}`);
+      }
+    } finally {
+      setCommitting(false);
+      scrollToStatus();
+    }
+  };
 
   return (
     <div className="wiz-step-content">
@@ -579,12 +678,19 @@ function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDo
         >
           📦 requirements.txt
         </button>
+        <button
+          className={`wiz-tab ${activeTab === 'startsh' ? 'active' : ''}`}
+          onClick={() => setActiveTab('startsh')}
+        >
+          🚀 start.sh
+        </button>
       </div>
 
       <pre className="wiz-code">
         {activeTab === 'python' && pythonCode}
         {activeTab === 'yaml' && yamlConfig}
         {activeTab === 'reqs' && reqs}
+        {activeTab === 'startsh' && startSh}
       </pre>
 
       {/* Download section */}
@@ -604,21 +710,22 @@ function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDo
         </button>
       </div>
 
-      {/* Project integration section */}
-      <div className="wiz-section-header">📂 Project Integration</div>
+      {/* Save to Beamline Repo & ArgoCD section */}
+      <div className="wiz-section-header">📂 Save to Beamline Repo &amp; Deploy via ArgoCD</div>
       <div className="wiz-project-panel">
         <div className="wiz-field">
-          <label>Project Path</label>
+          <label>Directory in repo</label>
           <input
             type="text"
             value={projectPath}
             onChange={(e) => setProjectPath(e.target.value)}
-            placeholder={DEFAULT_TASK_PATH}
+            placeholder={`${DEFAULT_TASK_PATH}/${taskDef.module || 'my_task'}`}
           />
           <span className="wiz-hint">
-            Files will be placed in <code>{taskPath}/</code>
+            Files: <code>{projectPath}/{taskDef.module || 'task'}.py</code>, <code>config.yaml</code>, <code>requirements.txt</code>, <code>start.sh</code>
           </span>
         </div>
+
         <button className="toolbar-btn active" onClick={handleDownloadProjectZip}>
           📦 Download Project ZIP
         </button>
@@ -640,7 +747,7 @@ function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDo
                 type="text"
                 value={gitUrl}
                 onChange={(e) => setGitUrl(e.target.value)}
-                placeholder="https://github.com/org/beamline-project.git"
+                placeholder="https://gitlab.infn.it/org/beamline-project.git"
               />
             </div>
             <div className="wiz-git-row">
@@ -654,46 +761,57 @@ function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDo
                 />
               </div>
               <div className="wiz-field" style={{ flex: 1 }}>
-                <label>Task Name</label>
-                <input type="text" value={taskDef.name} disabled />
-              </div>
-              <div className="wiz-field" style={{ flex: 1 }}>
-                <label>PAT (optional)</label>
+                <label>PAT</label>
                 <input
                   type="password"
                   value={gitPat}
                   onChange={(e) => setGitPat(e.target.value)}
-                  placeholder="ghp_xxxx…"
+                  placeholder="glpat-xxxx…"
                 />
               </div>
             </div>
 
-            {gitUrl && (
-              <div className="wiz-git-cmd">
-                <label>Quick-start commands:</label>
-                <pre className="wiz-code wiz-code--small">{gitCloneCmd}</pre>
-              </div>
-            )}
+            {/* ArgoCD registration toggle */}
+            <label className="wiz-checkbox-row">
+              <input
+                type="checkbox"
+                checked={registerArgo}
+                onChange={(e) => setRegisterArgo(e.target.checked)}
+              />
+              <span>Register as ArgoCD soft IOC application</span>
+              <span className="wiz-hint" style={{ marginLeft: 8 }}>
+                Updates <code>{SOFTIOC_VALUES_PATH}</code> — creates an ArgoCD Application that deploys this task as a standalone pod
+              </span>
+            </label>
 
             <div className="wiz-download-bar">
-              <button className="toolbar-btn active" onClick={handleDownloadProjectZip}>
-                📦 Download ZIP (project structure)
+              <button className="toolbar-btn active" onClick={handleAddToRepo} disabled={!gitUrl || !gitPat || committing}>
+                {committing ? '⏳ Committing…' : registerArgo ? '🚀 Add to Repo & Register ArgoCD App' : '📂 Add to Beamline Repo'}
               </button>
             </div>
 
-            {/* Deploy to controller */}
+            <div ref={gitStatusRef}>
+              {gitCommitStatus && (
+                <div className={`wiz-git-status ${gitCommitStatus.startsWith('✅') ? 'wiz-git-status--ok' : gitCommitStatus.startsWith('❌') ? 'wiz-git-status--err' : 'wiz-git-status--busy'}`}>
+                  {gitCommitStatus}
+                </div>
+              )}
+            </div>
+
+            {/* Deploy to controller (hot-load into running instance) */}
             {controllerApiUrl && gitUrl && (
               <div className="wiz-deploy-section">
-                <div className="wiz-section-header">🚀 Deploy to Controller</div>
+                <div className="wiz-section-header">🔄 Hot-deploy to Running Controller</div>
+                <span className="wiz-hint">Load this task into the currently running beamline controller (does not create a standalone pod).</span>
                 <button
-                  className="toolbar-btn active"
+                  className="toolbar-btn"
                   onClick={async () => {
                     setDeployStatus('⏳ Deploying...');
                     try {
                       const result = await deployPlugin(controllerApiUrl, {
                         name: taskDef.module,
                         git_url: gitUrl,
-                        path: `${projectPath}/${taskDef.module}`,
+                        path: projectPath,
                         pat: gitPat || undefined,
                         branch: gitBranch || 'main',
                       });
@@ -703,7 +821,7 @@ function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDo
                     }
                   }}
                 >
-                  🚀 Deploy
+                  🔄 Hot-deploy to Controller
                 </button>
                 {deployStatus && <div className={`bc-status-msg ${deployStatus.startsWith('✅') ? 'bc-status--ok' : deployStatus.startsWith('❌') ? 'bc-status--error' : ''}`}>{deployStatus}</div>}
               </div>
@@ -713,14 +831,14 @@ function StepPreview({ taskDef, prefix, controllerApiUrl, onDownloadPython, onDo
       </div>
 
       <div className="wiz-info">
-        <h4>How to use</h4>
+        <h4>How it works</h4>
         <ol>
-          <li>Download the <strong>Project ZIP</strong> — files are pre-structured in <code>{taskPath}/</code></li>
-          <li>Extract into your beamline project git repository</li>
-          <li>Merge the task entry from <code>config.yaml</code> into the controller's main <code>controller-config.yaml</code></li>
-          <li>Commit, push, and restart the beamline controller</li>
+          <li><strong>Add to Repo &amp; Register ArgoCD App</strong> — commits task files + a <code>start.sh</code> launcher to the beamline git repo, then updates <code>{SOFTIOC_VALUES_PATH}</code> to register the soft IOC as an ArgoCD Application</li>
+          <li>ArgoCD detects the change and automatically deploys a new pod running your task via <code>iocmng-server</code></li>
+          <li>The pod clones the task code from git, installs dependencies, and starts the soft IOC</li>
           <li>PVs will be available as <code>{prefix}:{(taskDef.name || 'TASK').toUpperCase()}:*</code></li>
         </ol>
+        <p className="wiz-hint">Use <strong>🔄 Hot-deploy</strong> to load the task into an existing controller without creating a separate pod.</p>
       </div>
     </div>
   );

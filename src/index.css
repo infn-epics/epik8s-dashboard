@@ -7034,6 +7034,50 @@ body,
   word-break: break-all;
 }
 
+/* Streaming badge */
+.k8s-stream-badge {
+  color: #4ade80;
+  font-size: 0.75rem;
+  margin-left: 8px;
+  animation: k8s-blink 1.5s ease-in-out infinite;
+}
+@keyframes k8s-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Terminal drawer (exec/attach) */
+.k8s-term-drawer {
+  height: 350px;
+}
+.k8s-term-body {
+  background: #0a0a0a;
+  color: #00ff00;
+}
+.k8s-term-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #222;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+}
+.k8s-term-input {
+  flex: 1;
+  padding: 5px 8px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 0.82rem;
+  background: #111;
+  color: #00ff00;
+  border: 1px solid #333;
+  border-radius: 3px;
+  outline: none;
+}
+.k8s-term-input:focus {
+  border-color: #4ade80;
+}
+
 /* ─── Channel Browser View ────────────────────────────────── */
 .channel-browser-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .cb-status { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; }
@@ -7236,10 +7280,13 @@ body,
 .bc-detail-desc { font-size: 0.85rem; color: #94a3b8; margin: -8px 0 12px; }
 
 /* Action bar */
-.bc-action-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+.bc-action-bar { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
 .bc-action-btn { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--color-border, #334155); background: transparent; color: #94a3b8; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
 .bc-action-btn:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
 .bc-action-btn.active { background: rgba(59,130,246,.15); border-color: #3b82f6; color: #60a5fa; }
+.bc-action-btn--danger { color: #f87171; border-color: #7f1d1d; }
+.bc-action-btn--danger:hover { background: rgba(248,113,113,.12); color: #fca5a5; }
+.bc-confirm-delete { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #f87171; }
 
 /* Editor section */
 .bc-editor-section { margin-bottom: 14px; }
@@ -7268,6 +7315,19 @@ body,
 
 /* Import result description */
 .import-result-desc { font-size: 0.82rem; color: #94a3b8; font-style: italic; }
+
+/* Controller logs drawer (inline, not fixed) */
+.bc-logs-drawer {
+  margin-top: 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow: hidden;
+}
+.bc-logs-drawer .k8s-logs-body { max-height: 280px; }
 
 /* Wizard deploy section */
 .wiz-deploy-section { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -7365,9 +7425,38 @@ body,
 .wiz-git-toggle { margin-top: 4px; }
 .wiz-git-panel { background: rgba(0,0,0,.1); border: 1px solid var(--color-border, #334155); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .wiz-git-row { display: flex; gap: 8px; }
+.wiz-checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #e2e8f0; cursor: pointer; padding: 6px 0; }
+.wiz-checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer; }
+.wiz-checkbox-row .wiz-hint { font-size: 0.72rem; }
 .wiz-git-cmd { display: flex; flex-direction: column; gap: 4px; }
 .wiz-git-cmd label { font-size: 0.78rem; color: #94a3b8; }
 .wiz-code--small { max-height: 120px; font-size: 0.72rem; padding: 10px; }
+
+/* Git commit status banner */
+.wiz-git-status {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.wiz-git-status--ok {
+  background: rgba(34, 197, 94, .15);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, .3);
+}
+.wiz-git-status--err {
+  background: rgba(239, 68, 68, .15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, .3);
+}
+.wiz-git-status--busy {
+  background: rgba(59, 130, 246, .12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, .25);
+  animation: k8s-blink 1.5s ease-in-out infinite;
+}
 
 /* Import Task Dialog */
 .import-dialog { background: var(--color-surface, #1e293b); border: 1px solid var(--color-border, #334155); border-radius: 10px; width: min(560px, 92vw); max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column; }
@@ -7445,3 +7534,263 @@ body,
   flex-shrink: 0;
 }
 .cert-banner-close:hover { background: rgba(0,0,0,.1); }
+
+/* ====================================================================
+   SoftIOC Dashboard
+   ==================================================================== */
+
+/* === Main View === */
+.sioc-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.sioc-view-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; flex-shrink: 0; }
+.sioc-view-title h2 { font-size: 1.25rem; font-weight: 600; }
+.sioc-view-stats { font-size: 0.8rem; color: var(--text-dim); margin-left: 12px; }
+.sioc-dirty-badge { display: inline-block; margin-left: 8px; padding: 1px 8px; font-size: 0.7rem; border-radius: 10px; background: var(--orange); color: #000; font-weight: 600; }
+
+/* === Sync area === */
+.sioc-view-actions { display: flex; gap: 8px; align-items: center; }
+.sioc-sync-area { display: flex; align-items: center; gap: 8px; }
+.sioc-sync-ok { font-size: 0.76rem; color: var(--green); white-space: nowrap; }
+.sioc-sync-busy { font-size: 0.76rem; color: var(--text-dim); white-space: nowrap; }
+.sioc-sync-error { font-size: 0.76rem; color: var(--red); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* === Buttons === */
+.sioc-btn { border: none; border-radius: var(--radius); cursor: pointer; font-size: 0.85rem; padding: 7px 16px; font-weight: 500; transition: background .15s, box-shadow .15s; }
+.sioc-btn-primary { background: var(--accent); color: #fff; }
+.sioc-btn-primary:hover { background: var(--accent-hover); }
+.sioc-btn-secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
+.sioc-btn-secondary:hover { background: var(--border); }
+.sioc-btn-sm { font-size: 0.78rem; padding: 4px 10px; }
+.sioc-btn-danger { background: var(--red); color: #fff; }
+.sioc-btn-danger:hover { opacity: .85; }
+.sioc-btn-icon { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 4px; color: var(--text-dim); border-radius: 4px; }
+.sioc-btn-icon:hover { background: var(--surface-hover); color: var(--text); }
+
+/* === Tab Bar === */
+.sioc-tab-bar { display: flex; gap: 2px; padding: 0 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sioc-tab { display: flex; align-items: center; gap: 6px; padding: 10px 16px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: color .15s, border-color .15s; }
+.sioc-tab:hover { color: var(--text); }
+.sioc-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sioc-tab-icon { font-size: 1rem; }
+
+/* === Tab Content === */
+.sioc-tab-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+/* === Builder Empty State === */
+.sioc-builder-tab { height: 100%; }
+.sioc-builder-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; gap: 12px; padding: 40px; }
+.sioc-builder-empty-icon { font-size: 3rem; }
+.sioc-builder-empty h3 { font-size: 1.1rem; font-weight: 600; }
+.sioc-builder-empty p { max-width: 420px; color: var(--text-dim); font-size: 0.88rem; line-height: 1.5; }
+
+/* === Wizard === */
+.sioc-wizard-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.sioc-wizard { width: 760px; max-width: 95vw; max-height: 85vh; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+.sioc-wizard-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.sioc-wizard-header h3 { font-size: 1rem; font-weight: 600; }
+.sioc-wizard-steps { display: flex; gap: 4px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+.sioc-wizard-step { padding: 6px 12px; font-size: 0.78rem; border-radius: 20px; background: var(--surface-hover); color: var(--text-dim); cursor: default; }
+.sioc-wizard-step.active { background: var(--accent); color: #fff; }
+.sioc-wizard-step.done { background: var(--green); color: #fff; }
+.sioc-wizard-body { flex: 1; overflow-y: auto; padding: 20px; }
+.sioc-wizard-footer { display: flex; justify-content: space-between; padding: 12px 20px; border-top: 1px solid var(--border); }
+
+/* === Template Grid === */
+.sioc-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.sioc-template-card { padding: 16px; background: var(--surface-hover); border: 2px solid transparent; border-radius: var(--radius); cursor: pointer; text-align: center; transition: border-color .15s, transform .1s; }
+.sioc-template-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.sioc-template-card.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.sioc-template-card-icon { font-size: 2rem; margin-bottom: 8px; }
+.sioc-template-card h4 { font-size: 0.9rem; margin-bottom: 4px; }
+.sioc-template-card p { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
+
+/* === Form Controls (wizard) === */
+.sioc-form-group { margin-bottom: 14px; }
+.sioc-form-group label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-dim); margin-bottom: 4px; }
+.sioc-form-group input,
+.sioc-form-group select,
+.sioc-form-group textarea { width: 100%; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; font-family: inherit; }
+.sioc-form-group textarea { resize: vertical; min-height: 60px; }
+.sioc-form-group input:focus,
+.sioc-form-group select:focus,
+.sioc-form-group textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.sioc-form-row { display: flex; gap: 12px; }
+.sioc-form-row > .sioc-form-group { flex: 1; }
+.sioc-form-check { display: flex; align-items: center; gap: 8px; }
+.sioc-form-check input { width: auto; }
+
+/* === PV Editor rows (wizard) === */
+.sioc-pv-list { display: flex; flex-direction: column; gap: 8px; }
+.sioc-pv-item { display: flex; gap: 8px; align-items: flex-start; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.sioc-pv-item-fields { flex: 1; display: grid; grid-template-columns: 1fr 100px 1fr; gap: 6px; }
+.sioc-pv-item-fields input,
+.sioc-pv-item-fields select { padding: 5px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.8rem; }
+.sioc-pv-add { font-size: 0.82rem; }
+
+/* === Rule Editor (wizard) === */
+.sioc-rule-list { display: flex; flex-direction: column; gap: 10px; }
+.sioc-rule-card { padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.sioc-rule-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sioc-rule-card-header strong { font-size: 0.85rem; }
+.sioc-rule-kv { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.sioc-rule-kv-pair { display: flex; gap: 4px; }
+.sioc-rule-kv-pair input { width: 120px; padding: 4px 6px; font-size: 0.78rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); }
+
+/* === Preview (wizard) === */
+.sioc-preview-section { margin-bottom: 16px; }
+.sioc-preview-section h4 { font-size: 0.88rem; margin-bottom: 6px; }
+.sioc-preview-code { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.78rem; line-height: 1.5; overflow-x: auto; white-space: pre; color: var(--text-dim); max-height: 300px; overflow-y: auto; }
+.sioc-preview-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* === Visualizer === */
+.sioc-visualizer { display: flex; flex-direction: column; gap: 12px; }
+.sioc-visualizer-empty { text-align: center; padding: 40px; color: var(--text-dim); }
+
+/* === SoftIOC Card === */
+.sioc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: box-shadow .15s; }
+.sioc-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.sioc-card-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; user-select: none; border-left: 3px solid var(--border); }
+.sioc-card-header.status-RUN    { border-left-color: var(--green); }
+.sioc-card-header.status-INIT   { border-left-color: var(--accent); }
+.sioc-card-header.status-PAUSED { border-left-color: var(--orange); }
+.sioc-card-header.status-ERROR  { border-left-color: var(--red); }
+.sioc-card-header.status-END    { border-left-color: var(--text-dim); }
+.sioc-card-title { font-weight: 600; font-size: 0.92rem; }
+.sioc-card-prefix { font-size: 0.78rem; color: var(--text-dim); margin-left: 8px; font-family: monospace; }
+.sioc-card-badges { display: flex; gap: 6px; align-items: center; }
+.sioc-card-body { padding: 12px 16px; border-top: 1px solid var(--border); }
+
+/* === Status Badge === */
+.sioc-status-badge { display: inline-block; padding: 2px 10px; font-size: 0.72rem; font-weight: 600; border-radius: 10px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* === LED indicator === */
+.sioc-led { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.sioc-led.on { background: var(--green); box-shadow: 0 0 4px var(--green); }
+.sioc-led.off { background: var(--text-dim); }
+
+/* === Live PV Rows === */
+.sioc-pv-section { margin-top: 10px; }
+.sioc-pv-section-title { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.sioc-pv-live-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 0.83rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+.sioc-pv-live-row:last-child { border-bottom: none; }
+.sioc-pv-name { font-family: monospace; font-size: 0.8rem; flex-shrink: 0; min-width: 140px; }
+.sioc-pv-value { font-family: monospace; font-weight: 500; min-width: 80px; }
+.sioc-pv-value.severity-major { color: var(--red); }
+.sioc-pv-value.severity-minor { color: var(--orange); }
+.sioc-pv-value.severity-none  { color: var(--green); }
+.sioc-pv-link-badge { font-size: 0.72rem; color: var(--text-dim); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; display: inline-flex; align-items: center; gap: 4px; }
+.sioc-pv-link-badge code { font-size: 0.72rem; background: var(--bg); padding: 0 4px; border-radius: 3px; }
+.sioc-link-live-val { color: var(--accent); font-weight: 600; }
+
+/* === Task Picker (Links tab) === */
+.sioc-task-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* === Rules Summary === */
+.sioc-rules-summary { margin-top: 8px; }
+.sioc-rule-summary-item { display: flex; align-items: baseline; gap: 8px; font-size: 0.8rem; padding: 3px 0; }
+.sioc-rule-summary-item code { font-size: 0.76rem; background: var(--bg); padding: 1px 6px; border-radius: 3px; color: var(--text-dim); }
+
+/* === Card Actions === */
+.sioc-card-actions { display: flex; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+/* === Link Editor === */
+.sioc-link-editor { display: flex; flex-direction: column; gap: 14px; }
+.sioc-link-select { margin-bottom: 10px; }
+.sioc-link-select select { padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; min-width: 240px; }
+.sioc-link-editor-empty { text-align: center; padding: 40px; color: var(--text-dim); }
+
+.sioc-link-canvas { position: relative; min-height: 300px; }
+.sioc-link-columns { display: flex; justify-content: space-between; gap: 40px; }
+.sioc-link-column { flex: 1; }
+.sioc-link-column-title { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; text-align: center; }
+
+.sioc-link-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; font-size: 0.83rem; font-family: monospace; transition: background .1s, border-color .1s; }
+.sioc-link-row.highlighted { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-color: var(--accent); }
+.sioc-link-row input { flex: 1; padding: 4px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.8rem; font-family: monospace; }
+
+.sioc-link-svg { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.sioc-link-line { stroke: var(--accent); stroke-width: 2; fill: none; opacity: .35; transition: opacity .15s; }
+.sioc-link-line.highlighted { opacity: 1; stroke-width: 2.5; }
+
+.sioc-link-unlinked { margin-top: 16px; }
+.sioc-link-unlinked-title { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); margin-bottom: 8px; }
+.sioc-link-unlinked-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 0.82rem; font-family: monospace; color: var(--text-dim); }
+
+/* === Values Editor === */
+.sioc-values-editor { display: flex; flex-direction: column; gap: 14px; }
+.sioc-values-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sioc-values-import { display: flex; gap: 8px; align-items: center; }
+.sioc-values-import textarea { width: 100%; min-height: 100px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: monospace; font-size: 0.8rem; resize: vertical; }
+
+.sioc-values-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.sioc-values-table th { text-align: left; padding: 8px 10px; background: var(--surface-hover); border-bottom: 2px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; }
+.sioc-values-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.sioc-values-table td input { width: 100%; padding: 4px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.82rem; }
+.sioc-values-table tr:hover td { background: var(--surface-hover); }
+
+.sioc-values-defaults { padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.sioc-values-defaults-title { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+.sioc-values-defaults-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.sioc-values-default-tag { padding: 3px 10px; background: var(--surface-hover); border-radius: 12px; font-size: 0.76rem; font-family: monospace; color: var(--text-dim); }
+
+.sioc-values-yaml { margin-top: 10px; }
+.sioc-values-yaml pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.78rem; line-height: 1.5; overflow: auto; max-height: 400px; color: var(--text-dim); }
+
+/* === Function Reference Panel === */
+.sioc-fn-ref { margin: 10px 0; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); overflow: hidden; }
+.sioc-fn-ref-toggle { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 12px; background: none; border: none; color: var(--accent); font-size: 0.82rem; font-weight: 500; cursor: pointer; text-align: left; }
+.sioc-fn-ref-toggle:hover { background: var(--surface-hover); }
+.sioc-fn-ref-body { padding: 0 12px 12px; max-height: 350px; overflow-y: auto; }
+.sioc-fn-ref-group { margin-top: 10px; }
+.sioc-fn-ref-group h5 { font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); margin-bottom: 4px; }
+.sioc-fn-ref-vars { display: flex; flex-wrap: wrap; gap: 4px; }
+.sioc-fn-var { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.74rem; font-family: monospace; }
+.sioc-fn-var--input { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); color: var(--accent); }
+.sioc-fn-var--output { background: color-mix(in srgb, var(--green) 15%, var(--surface)); color: var(--green); }
+.sioc-fn-var--buffer { background: color-mix(in srgb, var(--orange) 15%, var(--surface)); color: var(--orange); }
+.sioc-fn-ref-list { display: flex; flex-direction: column; gap: 2px; }
+.sioc-fn-item { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 0.78rem; }
+.sioc-fn-item code { font-size: 0.76rem; background: var(--surface); padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+.sioc-fn-desc { color: var(--text-dim); font-size: 0.74rem; }
+
+/* === Transforms Step === */
+.sioc-wizard-transforms { display: flex; flex-direction: column; gap: 10px; }
+.sioc-transform-card { padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.sioc-transform-row { display: flex; gap: 8px; align-items: flex-end; }
+.sioc-transform-row label { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; font-weight: 500; color: var(--text-dim); }
+.sioc-transform-row select,
+.sioc-transform-row input[type="text"] { padding: 6px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.82rem; }
+.sioc-transform-row select { min-width: 140px; }
+.sioc-full-width { flex: 1; }
+.sioc-full-width input { width: 100%; }
+
+/* === Rules Step extras === */
+.sioc-wizard-rules { display: flex; flex-direction: column; gap: 10px; }
+.sioc-rule-header { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.sioc-rule-header input { flex: 1; padding: 5px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.85rem; font-weight: 600; font-family: monospace; letter-spacing: .5px; }
+.sioc-rule-kv-section { display: flex; gap: 16px; margin-top: 8px; }
+.sioc-rule-kv-section > .sioc-rule-kv { flex: 1; }
+.sioc-kv-row { display: flex; gap: 4px; margin-top: 4px; }
+.sioc-kv-row input { padding: 4px 6px; font-size: 0.78rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); flex: 1; }
+.sioc-kv-key { font-family: monospace; opacity: .7; max-width: 120px; }
+.sioc-rule-defaults { margin-top: 10px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.sioc-rule-defaults strong { font-size: 0.82rem; }
+.sioc-default-tag { display: inline-block; padding: 2px 8px; background: var(--surface-hover); border-radius: 10px; font-size: 0.76rem; font-family: monospace; color: var(--text-dim); margin: 4px 4px 0 0; }
+
+/* === Buffer + Link Mode in PV row === */
+.sioc-pv-buffer { width: 52px !important; text-align: center; }
+.sioc-pv-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sioc-pv-header h3 { font-size: 0.95rem; font-weight: 600; }
+
+/* === Misc Wizard helpers === */
+.sioc-dim { font-size: 0.8rem; color: var(--text-dim); line-height: 1.5; }
+.sioc-empty { font-size: 0.84rem; color: var(--text-dim); text-align: center; padding: 20px; }
+.sioc-validation-errors { padding: 10px; background: color-mix(in srgb, var(--red) 10%, var(--surface)); border: 1px solid var(--red); border-radius: 6px; margin-bottom: 12px; }
+.sioc-validation-errors p { font-size: 0.82rem; color: var(--red); margin: 2px 0; }
+.sioc-preview-files { display: flex; flex-direction: column; gap: 12px; }
+.sioc-preview-file h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+.sioc-preview-file pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.78rem; line-height: 1.5; overflow: auto; max-height: 300px; color: var(--text-dim); white-space: pre; }
+.sioc-wizard-rules label,
+.sioc-wizard-transforms label { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; font-weight: 500; color: var(--text-dim); margin-top: 6px; }
+.sioc-wizard-rules textarea,
+.sioc-wizard-rules input[type="text"],
+.sioc-wizard-transforms input[type="text"] { padding: 6px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.82rem; font-family: inherit; }
