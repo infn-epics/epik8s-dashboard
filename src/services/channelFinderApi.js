@@ -41,6 +41,22 @@ export function getChannelFinderUrl() {
   return _baseUrl;
 }
 
+async function readJsonOrThrow(resp, label) {
+  const contentType = resp.headers.get('content-type') || '';
+  const text = await resp.text();
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || contentType.includes('text/html')) {
+      throw new Error(`${label}: expected JSON but received HTML (check ChannelFinder URL/proxy/authentication)`);
+    }
+    const preview = trimmed.slice(0, 120).replace(/\s+/g, ' ');
+    throw new Error(`${label}: invalid JSON response: ${preview}`);
+  }
+}
+
 /**
  * Query channels with pagination using the /combined endpoint.
  *
@@ -77,7 +93,7 @@ export async function searchChannels(filters = {}, page = 0, pageSize = 50) {
     const text = await resp.text();
     throw new Error(`ChannelFinder query failed (${resp.status}): ${text}`);
   }
-  const data = await resp.json();
+  const data = await readJsonOrThrow(resp, 'ChannelFinder query failed');
   return {
     totalCount: data.count ?? data.totalCount ?? 0,
     channels: data.channels ?? [],
@@ -94,7 +110,7 @@ export async function getChannel(channelName) {
     const text = await resp.text();
     throw new Error(`ChannelFinder channel fetch failed (${resp.status}): ${text}`);
   }
-  return resp.json();
+  return readJsonOrThrow(resp, 'ChannelFinder channel fetch failed');
 }
 
 /**

@@ -1194,38 +1194,85 @@ function LayoutEditor() {
     input.onchange = (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      console.info('[BeamlineLayoutImport] Starting import:', file.name);
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
           const data = JSON.parse(ev.target.result);
-          const imported = (data.elements || []).map(el => ({
-            id: el.id || `el-${Math.random().toString(36).slice(2, 8)}`,
-            type: el.type || 'device',
-            position: { x: el.x || 0, y: el.y || 0 },
-            parentId: el.parentId,
-            ...(el.type === 'group' ? { style: { zIndex: -1 } } : {}),
-            data: {
-              label: el.label || '?',
-              devices: el.devices || (el.device ? [{ id: el.device, name: el.label }] : []),
-              glyphType: el.glyphType || 'generic',
-              width: el.width || 90,
-              height: el.height || 60,
-              rotation: el.rotation || 0,
-              ...el,
-            },
-          }));
-          const importedEdges = (data.connections || []).map((c, i) => ({
-            id: `e-import-${i}`,
-            source: c.from,
-            target: c.to,
-            type: 'default',
-            style: { stroke: '#4488ff', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#4488ff' },
-          }));
+          const isBeamlineFormat = Array.isArray(data.elements);
+          const isDashboardFormat = Array.isArray(data.widgets);
+
+          let imported = [];
+          let importedEdges = [];
+
+          if (isBeamlineFormat) {
+            imported = data.elements.map(el => ({
+              id: el.id || `el-${Math.random().toString(36).slice(2, 8)}`,
+              type: el.type || 'device',
+              position: { x: el.x || 0, y: el.y || 0 },
+              parentId: el.parentId,
+              ...(el.type === 'group' ? { style: { zIndex: -1 } } : {}),
+              data: {
+                label: el.label || '?',
+                devices: el.devices || (el.device ? [{ id: el.device, name: el.label }] : []),
+                glyphType: el.glyphType || 'generic',
+                width: el.width || 90,
+                height: el.height || 60,
+                rotation: el.rotation || 0,
+                ...el,
+              },
+            }));
+            importedEdges = (data.connections || []).map((c, i) => ({
+              id: `e-import-${i}`,
+              source: c.from,
+              target: c.to,
+              type: 'default',
+              style: { stroke: '#4488ff', strokeWidth: 2 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#4488ff' },
+            }));
+          } else if (isDashboardFormat) {
+            // Convert dashboard widgets to annotation nodes so /layout can visualize them.
+            imported = data.widgets.map((w, i) => {
+              const gx = w.layout?.x || 0;
+              const gy = w.layout?.y || 0;
+              const gw = w.layout?.w || 2;
+              const gh = w.layout?.h || 1;
+              const label = w.config?.text || w.config?.title || w.type || `Widget ${i + 1}`;
+              return {
+                id: `dw-${w.id || i}`,
+                type: 'annotation',
+                position: { x: gx * 120, y: gy * 70 },
+                data: {
+                  label,
+                  annotationType: 'label',
+                  fontSize: w.config?.fontSize || 14,
+                  color: w.config?.foreground || '#e1e4ed',
+                  width: gw * 110,
+                  height: gh * 60,
+                },
+              };
+            });
+            importedEdges = [];
+          } else {
+            throw new Error('Unsupported JSON format. Expected BeamlineLayout (elements/connections) or Dashboard (widgets).');
+          }
+
+          if (imported.length === 0) {
+            throw new Error('No elements found in imported file');
+          }
+
           setNodes(imported);
           setEdges(importedEdges);
           setDirty(true);
+          console.info('[BeamlineLayoutImport] Imported:', {
+            file: file.name,
+            nodeCount: imported.length,
+            edgeCount: importedEdges.length,
+            sourceFormat: isBeamlineFormat ? 'beamline' : 'dashboard',
+          });
+          alert(`Imported layout from ${isBeamlineFormat ? 'beamline' : 'dashboard'} JSON: ${imported.length} node${imported.length === 1 ? '' : 's'}, ${importedEdges.length} connection${importedEdges.length === 1 ? '' : 's'}.`);
         } catch (err) {
+          console.error('[BeamlineLayoutImport] Import failed:', err);
           alert('Invalid layout JSON: ' + err.message);
         }
       };

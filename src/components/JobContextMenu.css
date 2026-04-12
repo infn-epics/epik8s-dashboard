@@ -1,9 +1,9 @@
 .job-context-menu {
   position: fixed;
-  background: white;
-  border: 1px solid #ccc;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 150px;
   padding: 4px 0;
@@ -14,32 +14,33 @@
   padding: 8px 16px;
   cursor: pointer;
   user-select: none;
+  color: var(--text);
   transition: background-color 0.2s;
 }
 
 .context-menu-item:hover {
-  background-color: #f0f0f0;
+  background-color: var(--surface-hover);
 }
 
 .context-menu-item.context-menu-item--action {
-  color: #1976d2;
+  color: var(--accent);
   font-weight: 500;
 }
 
 .context-menu-item.context-menu-item--action:hover {
-  background-color: #e3f2fd;
+  background-color: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
 .context-menu-item.context-menu-item--danger {
-  color: #d32f2f;
+  color: var(--red);
 }
 
 .context-menu-item.context-menu-item--danger:hover {
-  background-color: #ffebee;
+  background-color: color-mix(in srgb, var(--red) 12%, var(--surface));
 }
 
 .context-menu-separator {
   height: 1px;
-  background-color: #e0e0e0;
+  background-color: var(--border);
   margin: 4px 0;
 }

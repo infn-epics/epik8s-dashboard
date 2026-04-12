@@ -68,13 +68,18 @@ export default function Sidebar({ collapsed, onToggle }) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
+      console.info('[DashboardImport] Starting import from sidebar:', file.name);
       const dash = await importDashboard(file);
       // Assign new id to avoid conflicts
       dash.id = generateId();
       updateDashboard(dash);
       refreshList();
       openDashboard(dash.id);
+      const count = Array.isArray(dash.widgets) ? dash.widgets.length : 0;
+      console.info('[DashboardImport] Imported dashboard:', { name: dash.name, id: dash.id, widgets: count });
+      alert(`Imported dashboard "${dash.name}" (${count} widget${count === 1 ? '' : 's'})`);
     } catch (err) {
+      console.error('[DashboardImport] Import failed:', err);
       alert(`Import failed: ${err.message}`);
     }
     e.target.value = '';

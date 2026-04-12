@@ -30,8 +30,9 @@ export function proxyUrl(url) {
     const u = new URL(url);
     // Don't proxy requests that are already local
     if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return url;
-    // Rewrite to local proxy path
-    return `/__proxy/${u.host}${u.pathname}${u.search}`;
+    // Rewrite to local proxy path (strip trailing slash to avoid double-slash when path is appended)
+    const path = u.pathname.replace(/\/+$/, '');
+    return `/__proxy/${u.host}${path}${u.search}`;
   } catch {
     return url;
   }

@@ -35,9 +35,6 @@ function collectEndpoints(config) {
   // K8s Backend
   endpoints.push({ label: 'K8s Backend', url: `https://${ns}-backend.${domain}/healthz` });
 
-  // Beamline Controller
-  endpoints.push({ label: 'Beamline Controller', url: `https://${ns}-beamline-controller.${domain}/api/v1/health` });
-
   // ChannelFinder
   const services = config?.epicsConfiguration?.services || {};
   const cf = services.channelfinder || {};

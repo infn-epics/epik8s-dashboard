@@ -31,6 +31,7 @@ const WidgetFrame = forwardRef(function WidgetFrame(
   const title = widget.config?.title || typeDef?.name || widget.type;
   const subtitle = widget.config?.subtitle || '';
   const icon = typeDef?.icon || '🔧';
+  const frameless = !!widget.config?.frameless && !editMode;
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -123,61 +124,63 @@ const WidgetFrame = forwardRef(function WidgetFrame(
   return (
     <div
       ref={ref}
-      className={`widget ${alarmClass} ${collapsed ? 'widget--collapsed' : ''} ${className || ''}`}
+      className={`widget ${alarmClass} ${collapsed ? 'widget--collapsed' : ''} ${frameless ? 'widget--frameless' : ''} ${className || ''}`}
       style={style}
       onContextMenu={handleContextMenu}
       {...rest}
     >
       {/* Header with drag handle */}
-      <div className="widget-header widget-drag-handle">
-        <div className="widget-title-area">
-          {hasPv && <span className={`widget-led ${ledClass}`} title={isConnected ? `Connected (${connectionPv})` : `Disconnected (${connectionPv})`} />}
-          <span className="widget-icon">{icon}</span>
-          <span className="widget-title">{title}</span>
-          {subtitle && <span className="widget-subtitle">{subtitle}</span>}
-        </div>
-        <div className="widget-actions">
-          {isAuthenticated && (
-            <button className="widget-btn" onClick={() => setShowTicket(true)} title="Create ticket">
-              🎫
-            </button>
-          )}
-          {editMode && onConfigure && (
-            <button className="widget-btn" onClick={() => onConfigure(widget)} title="Configure">
-              ⚙
-            </button>
-          )}
-          <button
-            className="widget-btn"
-            onClick={() => setShowDetail(true)}
-            title="Detail view"
-          >
-            ⤢
-          </button>
-          {hasViewMode ? (
-            <button
-              className={`widget-btn ${currentMode === 'detail' ? 'widget-btn--active' : ''}`}
-              onClick={toggleViewMode}
-              title={currentMode === 'essential' ? 'Switch to Detail' : 'Switch to Essential'}
-            >
-              {currentMode === 'essential' ? '◫' : '☰'}
-            </button>
-          ) : (
+      {!frameless && (
+        <div className="widget-header widget-drag-handle">
+          <div className="widget-title-area">
+            {hasPv && <span className={`widget-led ${ledClass}`} title={isConnected ? `Connected (${connectionPv})` : `Disconnected (${connectionPv})`} />}
+            <span className="widget-icon">{icon}</span>
+            <span className="widget-title">{title}</span>
+            {subtitle && <span className="widget-subtitle">{subtitle}</span>}
+          </div>
+          <div className="widget-actions">
+            {isAuthenticated && (
+              <button className="widget-btn" onClick={() => setShowTicket(true)} title="Create ticket">
+                🎫
+              </button>
+            )}
+            {editMode && onConfigure && (
+              <button className="widget-btn" onClick={() => onConfigure(widget)} title="Configure">
+                ⚙
+              </button>
+            )}
             <button
               className="widget-btn"
-              onClick={() => setCollapsed((c) => !c)}
-              title={collapsed ? 'Expand' : 'Collapse'}
+              onClick={() => setShowDetail(true)}
+              title="Detail view"
             >
-              {collapsed ? '▼' : '▲'}
+              ⤢
             </button>
-          )}
-          {editMode && onRemove && (
-            <button className="widget-btn widget-btn--danger" onClick={() => onRemove(widget.id)} title="Remove">
-              ✕
-            </button>
-          )}
+            {hasViewMode ? (
+              <button
+                className={`widget-btn ${currentMode === 'detail' ? 'widget-btn--active' : ''}`}
+                onClick={toggleViewMode}
+                title={currentMode === 'essential' ? 'Switch to Detail' : 'Switch to Essential'}
+              >
+                {currentMode === 'essential' ? '◫' : '☰'}
+              </button>
+            ) : (
+              <button
+                className="widget-btn"
+                onClick={() => setCollapsed((c) => !c)}
+                title={collapsed ? 'Expand' : 'Collapse'}
+              >
+                {collapsed ? '▼' : '▲'}
+              </button>
+            )}
+            {editMode && onRemove && (
+              <button className="widget-btn widget-btn--danger" onClick={() => onRemove(widget.id)} title="Remove">
+                ✕
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Body */}
       {!collapsed && (

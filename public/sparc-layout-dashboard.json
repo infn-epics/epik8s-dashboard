@@ -1,0 +1,50 @@
+{
+  "id": "sparc-layout-static-v2",
+  "name": "SPARC Layout (Static Visible)",
+  "description": "Static SPARC layout translated from image. Uses visible label widgets so structure appears even without PV connections.",
+  "createdAt": "2026-04-12T21:30:00.000Z",
+  "updatedAt": "2026-04-12T21:30:00.000Z",
+  "widgets": [
+    { "id": "t0", "type": "label", "config": { "text": "SPARC LAYOUT", "fontSize": 24, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 0, "y": 0, "w": 12, "h": 1, "minW": 2, "minH": 1 } },
+
+    { "id": "s-gun", "type": "label", "config": { "text": "GUN", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 0, "y": 1, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "s-ac1", "type": "label", "config": { "text": "AC1", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 2, "y": 1, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "s-ac2", "type": "label", "config": { "text": "AC2", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 4, "y": 1, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "s-ac3", "type": "label", "config": { "text": "AC3", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 6, "y": 1, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "s-cmb", "type": "label", "config": { "text": "COMB", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 8, "y": 1, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "s-ptl", "type": "label", "config": { "text": "PTL", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 10, "y": 1, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+
+    { "id": "r1", "type": "label", "config": { "text": "GUN FLG 01", "frameless": false }, "layout": { "x": 0, "y": 2, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "r2", "type": "label", "config": { "text": "AC1 FLG 01", "frameless": false }, "layout": { "x": 2, "y": 2, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "r3", "type": "label", "config": { "text": "AC2 FLG 01", "frameless": false }, "layout": { "x": 4, "y": 2, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "r4", "type": "label", "config": { "text": "AC3 FLG 01", "frameless": false }, "layout": { "x": 6, "y": 2, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "r5", "type": "label", "config": { "text": "PTL FLG 01", "frameless": false }, "layout": { "x": 10, "y": 2, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+
+    { "id": "c1", "type": "label", "config": { "text": "GUNCAM01", "frameless": false }, "layout": { "x": 0, "y": 3, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "c2", "type": "label", "config": { "text": "AC1CAM01", "frameless": false }, "layout": { "x": 2, "y": 3, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "c3", "type": "label", "config": { "text": "AC2CAM01", "frameless": false }, "layout": { "x": 4, "y": 3, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "c4", "type": "label", "config": { "text": "AC3CAM01", "frameless": false }, "layout": { "x": 6, "y": 3, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "c5", "type": "label", "config": { "text": "EOSCAM01", "frameless": false }, "layout": { "x": 8, "y": 3, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "c6", "type": "label", "config": { "text": "EOSCAM02", "frameless": false }, "layout": { "x": 10, "y": 3, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+
+    { "id": "sol1", "type": "label", "config": { "text": "AC1SOL", "frameless": false }, "layout": { "x": 2, "y": 4, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "sol2", "type": "label", "config": { "text": "AC2SOL", "frameless": false }, "layout": { "x": 4, "y": 4, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "cmb1", "type": "label", "config": { "text": "CMB PLV", "frameless": false }, "layout": { "x": 8, "y": 4, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "cmb2", "type": "label", "config": { "text": "CMB THV", "frameless": false }, "layout": { "x": 10, "y": 4, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+
+    { "id": "s-sabina", "type": "label", "config": { "text": "SABINA", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 0, "y": 6, "w": 6, "h": 1, "minW": 2, "minH": 1 } },
+    { "id": "s-utl", "type": "label", "config": { "text": "UTL", "fontSize": 18, "frameless": false, "horizontal_alignment": "center" }, "layout": { "x": 6, "y": 6, "w": 6, "h": 1, "minW": 2, "minH": 1 } },
+
+    { "id": "sbn1", "type": "label", "config": { "text": "SBNCAM00", "frameless": false }, "layout": { "x": 0, "y": 7, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "sbn2", "type": "label", "config": { "text": "SBNCAM01", "frameless": false }, "layout": { "x": 2, "y": 7, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "sbn3", "type": "label", "config": { "text": "SBNFLG00", "frameless": false }, "layout": { "x": 0, "y": 8, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "sbn4", "type": "label", "config": { "text": "SBNFLG01", "frameless": false }, "layout": { "x": 2, "y": 8, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+
+    { "id": "utl1", "type": "label", "config": { "text": "UTLCAM01", "frameless": false }, "layout": { "x": 6, "y": 7, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "utl2", "type": "label", "config": { "text": "UTLCAM02", "frameless": false }, "layout": { "x": 8, "y": 7, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "utl3", "type": "label", "config": { "text": "UTLFLG01", "frameless": false }, "layout": { "x": 6, "y": 8, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+    { "id": "utl4", "type": "label", "config": { "text": "UTLFLG02", "frameless": false }, "layout": { "x": 8, "y": 8, "w": 2, "h": 1, "minW": 1, "minH": 1 } },
+
+    { "id": "note", "type": "label", "config": { "text": "Static visible template. Replace labels with live widgets and bind exact PVs via Configure > Replace Type.", "fontSize": 12, "frameless": false, "horizontal_alignment": "left" }, "layout": { "x": 0, "y": 10, "w": 12, "h": 1, "minW": 2, "minH": 1 } }
+  ]
+}

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { getWidgetType, CATEGORY_ORDER } from './registry.js';
+import { getWidgetType, getWidgetTypes, getDefaultConfig, CATEGORY_ORDER } from './registry.js';
 import { useApp } from '../context/AppContext.jsx';
 
 /**
@@ -13,12 +13,20 @@ import { useApp } from '../context/AppContext.jsx';
  * Props:
  *  - widget: { id, type, config }
  *  - onSave: (widgetId, newConfig) => void
+ *  - onReplace: (widgetId, newType, newConfig) => void
  *  - onClose: () => void
  */
-export default function WidgetConfigPanel({ widget, onSave, onClose }) {
+export default function WidgetConfigPanel({ widget, onSave, onReplace, onClose }) {
   const typeDef = getWidgetType(widget.type);
+  const widgetTypes = useMemo(() => getWidgetTypes(), []);
+  const [targetType, setTargetType] = useState(widget.type);
   const [config, setConfig] = useState({ ...widget.config });
   const { devices } = useApp();
+
+  useEffect(() => {
+    setTargetType(widget.type);
+    setConfig({ ...widget.config });
+  }, [widget]);
 
   // Build PV name suggestions from devices
   const pvSuggestions = useMemo(() => {
@@ -55,6 +63,12 @@ export default function WidgetConfigPanel({ widget, onSave, onClose }) {
     onClose();
   };
 
+  const handleReplace = () => {
+    if (!onReplace || !targetType || targetType === widget.type) return;
+    const mergedConfig = buildCompatibleConfig(widget.type, targetType, config);
+    onReplace(widget.id, targetType, mergedConfig);
+  };
+
   // Group properties
   const groups = useMemo(() => {
     const g = {};
@@ -81,6 +95,38 @@ export default function WidgetConfigPanel({ widget, onSave, onClose }) {
           <div className="config-type-info">
             <span className="config-type-badge">{typeDef.icon} {typeDef.name}</span>
             <span className="config-type-cat">{typeDef.category}</span>
+          </div>
+          <div className="config-replace-row">
+            <label className="config-label">Replace with</label>
+            <div className="config-replace-controls">
+              <select
+                className="config-input"
+                value={targetType}
+                onChange={(e) => setTargetType(e.target.value)}
+              >
+                {CATEGORY_ORDER.map((category) => {
+                  const typesInCategory = widgetTypes.filter((wt) => wt.category === category);
+                  if (typesInCategory.length === 0) return null;
+                  return (
+                    <optgroup key={category} label={category}>
+                      {typesInCategory.map((wt) => (
+                        <option key={wt.type} value={wt.type}>
+                          {wt.icon} {wt.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+              <button
+                className="btn"
+                onClick={handleReplace}
+                disabled={!onReplace || targetType === widget.type}
+                title="Replace widget type and keep compatible properties"
+              >
+                Replace Type
+              </button>
+            </div>
           </div>
           {typeDef.description && (
             <div className="config-description">{typeDef.description}</div>
@@ -111,6 +157,43 @@ export default function WidgetConfigPanel({ widget, onSave, onClose }) {
       </div>
     </div>
   );
+}
+
+function buildCompatibleConfig(sourceType, targetType, currentConfig) {
+  const targetDef = getWidgetType(targetType);
+  if (!targetDef) return { ...currentConfig };
+
+  const defaultTargetConfig = getDefaultConfig(targetType);
+  const allowedKeys = new Set((targetDef.properties || []).map((p) => p.key));
+
+  const compatible = {};
+  for (const [key, value] of Object.entries(currentConfig || {})) {
+    if (allowedKeys.has(key) && value !== undefined) {
+      compatible[key] = value;
+    }
+  }
+
+  // Keep user-facing title/tooltip when present in target schema.
+  if (allowedKeys.has('title') && currentConfig?.title) compatible.title = currentConfig.title;
+  if (allowedKeys.has('tooltip') && currentConfig?.tooltip) compatible.tooltip = currentConfig.tooltip;
+
+  // Typical PV mapping fallback between single PV and prefix-based widgets.
+  if (allowedKeys.has('pv_name') && !compatible.pv_name && currentConfig?.pvPrefix) {
+    compatible.pv_name = currentConfig.pvPrefix;
+  }
+  if (allowedKeys.has('pvPrefix') && !compatible.pvPrefix && currentConfig?.pv_name) {
+    compatible.pvPrefix = currentConfig.pv_name;
+  }
+
+  // Preserve source widget type metadata if the target supports it.
+  if (allowedKeys.has('type') && sourceType) {
+    compatible.type = currentConfig?.type || sourceType;
+  }
+
+  return {
+    ...defaultTargetConfig,
+    ...compatible,
+  };
 }
 
 /** Collapsible property group */

@@ -51,6 +51,7 @@ const BASE_PROPERTIES = [
   { key: 'title', label: 'Name', type: 'string', default: '', group: 'General' },
   { key: 'visible', label: 'Visible', type: 'boolean', default: true, group: 'General' },
   { key: 'tooltip', label: 'Tooltip', type: 'string', default: '', group: 'General' },
+  { key: 'frameless', label: 'Frameless', type: 'boolean', default: false, group: 'Style' },
 ];
 
 /** Style properties. */

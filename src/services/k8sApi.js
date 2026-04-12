@@ -36,6 +36,25 @@ export function getBackendUrl() {
   return _baseUrl;
 }
 
+function parseApiBody(text, contentType, path) {
+  if (!text) return null;
+  const trimmed = text.trim();
+  const isJsonType = (contentType || '').includes('application/json');
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  if (isJsonType || looksLikeJson) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      const preview = trimmed.slice(0, 120).replace(/\s+/g, ' ');
+      throw new Error(`Invalid JSON response for ${path}: ${preview}`);
+    }
+  }
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+    throw new Error(`Expected JSON for ${path} but received HTML (check backend URL/proxy/authentication)`);
+  }
+  return text;
+}
+
 /**
  * Generic authenticated fetch against the backend.
  */
@@ -54,7 +73,9 @@ async function apiFetch(path, token, options = {}) {
     const text = await resp.text();
     throw new Error(`API ${options.method || 'GET'} ${path} failed (${resp.status}): ${text}`);
   }
-  return resp.json();
+  const contentType = resp.headers.get('content-type') || '';
+  const text = await resp.text();
+  return parseApiBody(text, contentType, path);
 }
 
 // ─── ArgoCD Applications ────────────────────────────────────────────────

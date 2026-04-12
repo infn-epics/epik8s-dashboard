@@ -62,16 +62,16 @@ export default function WidgetPicker({ onAdd, onClose, devices = [] }) {
       <div className="picker-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="picker-header">
           <h3>Add Widget</h3>
-          <button className="widget-btn" onClick={onClose}>✕</button>
+          <button className="picker-close" onClick={onClose}>✕</button>
         </div>
 
         {/* Tabs */}
         <div className="picker-tabs">
-          <button className={`picker-tab ${tab === 'types' ? 'active' : ''}`} onClick={() => setTab('types')}>
+          <button className={`picker-tab ${tab === 'types' ? 'picker-tab--active' : ''}`} onClick={() => setTab('types')}>
             Widget Types
           </button>
           {devices.length > 0 && (
-            <button className={`picker-tab ${tab === 'devices' ? 'active' : ''}`} onClick={() => setTab('devices')}>
+            <button className={`picker-tab ${tab === 'devices' ? 'picker-tab--active' : ''}`} onClick={() => setTab('devices')}>
               From Config ({devices.length})
             </button>
           )}

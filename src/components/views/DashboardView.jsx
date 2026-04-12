@@ -5,8 +5,9 @@ import DashboardGrid from '../../components/layout/DashboardGrid.jsx';
 import WidgetFrame from '../../widgets/WidgetFrame.jsx';
 import WidgetConfigPanel from '../../widgets/WidgetConfigPanel.jsx';
 import WidgetPicker from '../../widgets/WidgetPicker.jsx';
-import { getWidgetComponent } from '../../widgets/registry.js';
+import { getWidgetComponent, getWidgetType } from '../../widgets/registry.js';
 import { exportDashboard, importDashboard } from '../../services/dashboardStorage.js';
+import { generateId } from '../../models/dashboard.js';
 
 /**
  * DashboardView — main dashboard editor/viewer.
@@ -17,8 +18,8 @@ export default function DashboardView() {
   const {
     activeDashboard,
     editMode, setEditMode,
-    addWidget, updateWidgetConfig, removeWidget, updateLayout,
-    updateDashboard, refreshList,
+    addWidget, updateWidget, updateWidgetConfig, removeWidget, updateLayout,
+    updateDashboard, refreshList, openDashboard,
   } = useDashboard();
   const { pvwsClient, devices } = useApp();
 
@@ -45,12 +46,44 @@ export default function DashboardView() {
   }, [updateLayout]);
 
   const handleAddWidget = useCallback((type, config) => {
-    addWidget(type, config);
+    const created = addWidget(type, config);
+    if (created) {
+      setConfigWidget(created);
+    }
   }, [addWidget]);
 
   const handleConfigSave = useCallback((widgetId, newConfig) => {
     updateWidgetConfig(widgetId, newConfig);
   }, [updateWidgetConfig]);
+
+  const handleReplaceWidget = useCallback((widgetId, newType, newConfig) => {
+    const existing = activeDashboard?.widgets?.find((w) => w.id === widgetId);
+    if (!existing) return;
+    const typeDef = getWidgetType(newType);
+    const minW = typeDef?.defaultSize?.minW || 1;
+    const minH = typeDef?.defaultSize?.minH || 1;
+    updateWidget(widgetId, {
+      type: newType,
+      config: newConfig,
+      layout: {
+        ...existing.layout,
+        minW,
+        minH,
+      },
+    });
+    setConfigWidget(null);
+  }, [activeDashboard, updateWidget]);
+
+  const handleStripTextFrames = useCallback(() => {
+    if (!activeDashboard) return;
+    const updatedWidgets = activeDashboard.widgets.map((w) => {
+      if (w.type === 'text-update' || w.type === 'text-entry') {
+        return { ...w, config: { ...w.config, frameless: true } };
+      }
+      return w;
+    });
+    updateDashboard({ ...activeDashboard, widgets: updatedWidgets });
+  }, [activeDashboard, updateDashboard]);
 
   const handleExport = () => {
     if (activeDashboard) exportDashboard(activeDashboard);
@@ -64,10 +97,18 @@ export default function DashboardView() {
       const file = e.target.files?.[0];
       if (!file) return;
       try {
+        console.info('[DashboardImport] Starting import from toolbar:', file.name);
         const dash = await importDashboard(file);
+        // Always import as a new dashboard instance to avoid collisions.
+        dash.id = generateId();
         updateDashboard(dash);
         refreshList();
+        openDashboard(dash.id);
+        const count = Array.isArray(dash.widgets) ? dash.widgets.length : 0;
+        console.info('[DashboardImport] Imported dashboard:', { name: dash.name, id: dash.id, widgets: count });
+        alert(`Imported dashboard "${dash.name}" (${count} widget${count === 1 ? '' : 's'})`);
       } catch (err) {
+        console.error('[DashboardImport] Import failed:', err);
         alert(`Import failed: ${err.message}`);
       }
     };
@@ -123,6 +164,13 @@ export default function DashboardView() {
         <div className="toolbar-controls">
           <button className="toolbar-btn toolbar-btn--accent" onClick={() => setShowPicker(true)}>
             + Add Widget
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={handleStripTextFrames}
+            title="Make Text Update/Text Entry widgets frameless"
+          >
+            Minimal Text
           </button>
           <button
             className={`toolbar-btn ${editMode ? 'active' : ''}`}
@@ -192,6 +240,7 @@ export default function DashboardView() {
         <WidgetConfigPanel
           widget={configWidget}
           onSave={handleConfigSave}
+          onReplace={handleReplaceWidget}
           onClose={() => setConfigWidget(null)}
         />
       )}
