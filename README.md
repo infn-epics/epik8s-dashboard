@@ -4,7 +4,7 @@
 
 **Author:** Andrea Michelotti
 
-A modular, configuration-driven React web application that provides a **Grafana-like experience** for creating and managing dashboards for EPICS-based particle accelerator systems. Supports both auto-generated views from YAML configuration and user-created custom dashboards with a pluggable widget system, plus a full graphical **Beamline Layout editor** powered by React Flow.
+A modular, configuration-driven React web application that provides a **Grafana-like experience** for creating and managing dashboards for EPICS-based particle accelerator systems. Supports both auto-generated views from YAML configuration and user-created custom dashboards with a pluggable widget system, plus a full graphical **Beamline Layout editor** powered by React Flow, a **SoftIOC Manager** for creating and deploying iocmng TaskBase soft IOCs, and a **Channel Browser** backed by ChannelFinder.
 
 ## Features
 
@@ -15,13 +15,15 @@ A modular, configuration-driven React web application that provides a **Grafana-
 - **Frameless mode** — Widgets can hide their header/border for clean display-panel layouts
 - **Multiple data sources** — Real-time EPICS PVs via PVWS WebSocket + historical data via Archiver Appliance REST
 - **YAML-driven auto-discovery** — Loads `values.yaml` at runtime to discover all IOCs, devices, cameras, and zones
-- **Multi-view application** — Custom Dashboards, Camera Array, Instrumentation, Beamline Overview, Beamline Layout, SoftIOC Manager
+- **Multi-view application** — Custom Dashboards, Camera Array, Instrumentation, Beamline Overview, Beamline Layout, SoftIOC Manager, Channel Browser
 - **Grafana-like UI** — Collapsible sidebar with dashboard list, toolbar, and grid editor
 - **Drag & drop layout** — react-grid-layout powered grids with resize, collapse, detail modals
 - **JSON persistence** — Dashboards and layouts saved to localStorage with export/import as JSON files
 - **Dark/Light theme** — Toggle between themes; preference saved
 - **Zone-based beamline view** — Devices grouped by zone with summary cards and expandable grids
 - **Graphical Beamline Layout editor** — React Flow canvas with device glyphs, groups/modules, shapes, connections, schematic view, and real-time PV status coloring
+- **SoftIOC Manager** — Full lifecycle management for iocmng TaskBase soft IOCs: builder wizard, live visualizer, link wiring editor, and `values-softiocs.yaml` deployment editor
+- **Channel Browser** — Paginated ChannelFinder search with metadata, live PV values, and Archiver integration
 
 ## Quick Start
 
@@ -41,7 +43,61 @@ Open http://localhost:5173. Place your `values.yaml` in `public/` or pass `?valu
 | Instrumentation | `/instrumentation` | All devices with search/filter and drag-drop layout |
 | Beamline | `/beamline` | Zone-grouped device overview with summary cards |
 | **Beamline Layout** | `/layout` | Graphical beamline editor — device nodes, groups, connections, SVG glyphs |
-| SoftIOC Manager | `/softioc` | Manage and monitor soft IOC deployments |
+| **SoftIOC Manager** | `/softioc` | Create, monitor, wire, and deploy iocmng-based soft IOCs |
+| Channel Browser | `/channels` | Paginated ChannelFinder search with live PV values and metadata |
+| Kubernetes | `/k8s` | ArgoCD applications, pods, deployments, statefulsets, nodes |
+| Tickets | `/tickets` | GitHub / GitLab issue tracker integration |
+| Settings | `/settings` | Data source URLs and Git PAT configuration |
+
+## SoftIOC Manager (`/softioc`)
+
+The SoftIOC Manager is a four-tab interface for the full lifecycle of [iocmng](https://github.com/infn-epics/iocmng) TaskBase-based soft IOCs.
+
+### Tabs
+
+| Tab | Description |
+|-----|-------------|
+| **Visualizer** | Live monitoring of running softiocs. Shows system PVs (ENABLE, STATUS, MESSAGE, VERSION, CYCLE_COUNT), user inputs with linked source values, and user outputs with linked target values. Severity colors follow EPICS alarm states. |
+| **Builder** | Step-by-step wizard to create a new softioc configuration. Outputs a `config.yaml` and optional Python skeleton, downloadable as a ZIP archive. |
+| **Links** | Visual wiring editor — connect softioc output PVs to input PVs across different softiocs by dragging connections. |
+| **Deployment** | Editor for `values-softiocs.yaml`, the Helm values file consumed by epik8s-chart to deploy each softioc as an ArgoCD Application. Import/export, inline table editing, and YAML preview. |
+
+### Builder wizard steps
+
+1. **Template** — choose a task type: `declarative`, `custom`, `interlock`, or `motor-interlock`
+2. **Basic Info** — IOC name, PV prefix, mode (`continuous` / `triggered` / `on-demand`), scan interval, description
+3. **Inputs** — define input PVs with type, units, and optional link wiring to an external EPICS PV
+4. **Outputs** — define output PVs with type, units, and optional link wiring
+5. **Rules** — condition-based rules with actuator PV writes (declarative templates only)
+6. **Preview** — review the generated `config.yaml` and Python skeleton; sync to Git repository; download as ZIP
+
+### `values-softiocs.yaml` structure
+
+```yaml
+softiocs:
+  my-softioc:
+    name: my-softioc
+    iocprefix: BEAMLINE:PREFIX
+    module: my_module
+    softiocType: task
+    image: ghcr.io/infn-epics/epik8s-beamline-controller:latest
+    start: /epics/ioc/config/start.sh
+    autosync: true
+    gitRepoConfig:
+      url: https://git.example.com/group/my-softioc.git
+      path: .
+      branch: main
+```
+
+## Channel Browser (`/channels`)
+
+Paginated search interface for the [ChannelFinder](https://channelfinder.readthedocs.io/) service.
+
+- **Filters**: channel name (wildcard), IOC name, zone, device type, device family, or raw ChannelFinder query string
+- **Results**: 50 channels per page with full property metadata on row expand
+- **Live values**: click a channel to see its current PV value inline
+- **Context menu**: right-click for copy PV name, live value display, or Archiver trend link
+- **ChannelFinder URL**: auto-derived from `values.yaml` or overridable in Settings
 
 ## Widget Types
 

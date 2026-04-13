@@ -141,6 +141,50 @@ const HELP = {
       },
     ],
   },
+  '/softioc': {
+    title: 'SoftIOC Manager',
+    icon: '🧩',
+    sections: [
+      {
+        heading: 'Overview',
+        body: 'Manage iocmng-based soft IOCs running as TaskBase plugins. Each softioc exposes system PVs (ENABLE, STATUS, MESSAGE, VERSION, CYCLE_COUNT) plus user-defined inputs and outputs declared in `config.yaml`.',
+      },
+      {
+        heading: 'Visualizer',
+        body: 'Live monitoring panel for all configured softiocs. Shows system PVs with severity coloring, user inputs with linked source PV values, and user outputs with linked target PV values. Expand a softioc card for full detail.',
+      },
+      {
+        heading: 'Builder',
+        body: 'Step-by-step wizard to create a new softioc configuration:\n• **Template** — choose type: declarative, custom, interlock, or motor-interlock\n• **Basic Info** — name, PV prefix, mode (continuous / triggered / on-demand), scan interval\n• **Inputs / Outputs** — define PVs with optional link wiring\n• **Rules** — condition-based rules with actuator writes (declarative templates)\n• **Preview** — review generated `config.yaml` and Python skeleton; download as ZIP',
+      },
+      {
+        heading: 'Links',
+        body: 'Visual editor for wiring softioc inputs and outputs together. Drag connections between PVs across different softiocs. Connections are stored in `values-softiocs.yaml`.',
+      },
+      {
+        heading: 'Deployment',
+        body: 'Editor for `values-softiocs.yaml` — the Helm values file used by epik8s-chart to create ArgoCD Applications for each softioc.\n• Import from file or sync from the Git repository\n• Add, remove, and inline-edit softioc entries\n• Preview the full YAML and copy or download it for use in the beamline repository',
+      },
+    ],
+  },
+  '/channels': {
+    title: 'Channel Browser',
+    icon: '📡',
+    sections: [
+      {
+        heading: 'Overview',
+        body: 'Search and browse EPICS channels registered in the ChannelFinder service. Displays channel metadata and live PV values for the selected channel.',
+      },
+      {
+        heading: 'Filtering',
+        body: '• **Name**: wildcard pattern, e.g. `SPARC:*:STATUS`\n• **IOC**: filter by IOC name\n• **Zone**: filter by beamline zone\n• **Type** and **Family**: filter by device type or family\n• **Raw query**: free-form ChannelFinder query string\nResults are paginated (50 channels per page).',
+      },
+      {
+        heading: 'Channel actions',
+        body: 'Click a row to expand full property metadata. Right-click for the context menu:\n• Copy PV name to clipboard\n• View live PV value inline\n• Open PV history in Archiver trend plot',
+      },
+    ],
+  },
   '/settings': {
     title: 'Settings',
     icon: '⚙',
@@ -167,7 +211,7 @@ const GENERAL_HELP = {
     },
     {
       heading: 'Navigation',
-      body: '• **Controls**: Dashboards, Beamline, Layout — device monitoring and visualization\n• **Monitor**: Cameras, Instrumentation — live data views\n• **Ops**: Kubernetes, Tickets — operational management\n• **Settings**: Data source configuration and authentication',
+      body: '• **Controls**: Dashboards, Beamline, Layout, SoftIOC — device monitoring, visualization, and soft IOC management\n• **Monitor**: Cameras, Instrumentation, Channels — live data and channel browsing\n• **Ops**: Kubernetes, Tickets — operational management\n• **Settings**: Data source configuration and authentication',
     },
     {
       heading: 'Configuration',
