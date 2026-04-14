@@ -4,6 +4,7 @@ import { parseGitUrl, fetchFileFromGit } from './gitApi.js';
 import { proxyUrl } from './devProxy.js';
 
 const VALUES_YAML_PATH = 'values.yaml';
+const GIT_VALUES_CANDIDATES = [VALUES_YAML_PATH, `deploy/${VALUES_YAML_PATH}`];
 
 /**
  * Resolve where to load values.yaml from.
@@ -57,10 +58,26 @@ export async function loadConfig(valuesPath = '/values.yaml', opts = {}) {
   let resolvedBranch = opts.gitbranch || 'main';
 
   if (resolvedGiturl) {
-    // Load values.yaml from the beamline git repository
+    // Load the beamline config from the repository.
+    // Some repos keep it at the root as values.yaml, others at deploy/values.yaml.
     const repoInfo = parseGitUrl(resolvedGiturl);
     if (!repoInfo) throw new Error(`Cannot parse git URL: ${resolvedGiturl}`);
-    text = await fetchFileFromGit(repoInfo, VALUES_YAML_PATH, resolvedBranch, opts.token || null);
+
+    const requestedPath = String(valuesPath || '').replace(/^\/+/, '') || VALUES_YAML_PATH;
+    const candidatePaths = [...new Set([requestedPath, ...GIT_VALUES_CANDIDATES])];
+    let lastError = null;
+
+    for (const candidate of candidatePaths) {
+      try {
+        text = await fetchFileFromGit(repoInfo, candidate, resolvedBranch, opts.token || null);
+        break;
+      } catch (err) {
+        lastError = err;
+        if (!String(err?.message || '').includes('404')) throw err;
+      }
+    }
+
+    if (!text && lastError) throw lastError;
   } else {
     const resp = await fetch(proxyUrl(valuesPath));
     if (!resp.ok) throw new Error(`Failed to load ${valuesPath}: ${resp.status}`);

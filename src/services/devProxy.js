@@ -21,9 +21,10 @@
  */
 export function proxyUrl(url) {
   if (!url) return url;
+  const isDev = Boolean(import.meta?.env?.DEV);
   // Only rewrite when the Vite dev server is running (it provides the /__proxy/ middleware).
   // Production builds served locally (e.g. `serve -s dist`) do NOT have the proxy.
-  if (!import.meta.env.DEV) return url;
+  if (!isDev) return url;
   const isLocal =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
@@ -77,7 +78,7 @@ function deriveBackendUrl() {
  * @returns {Promise<Response>}
  */
 export async function gitProxyFetch(rawUrl, token = null) {
-  if (import.meta.env.DEV) {
+  if (Boolean(import.meta?.env?.DEV)) {
     // Dev server: use the Vite proxy middleware
     const proxied = proxyUrl(rawUrl);
     const headers = {};
