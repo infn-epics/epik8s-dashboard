@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useDashboard } from '../../context/DashboardContext.jsx';
 import { useApp } from '../../context/AppContext.jsx';
+import { useGitStorage } from '../../hooks/useGitStorage.js';
 import DashboardGrid from '../../components/layout/DashboardGrid.jsx';
 import WidgetFrame from '../../widgets/WidgetFrame.jsx';
 import WidgetConfigPanel from '../../widgets/WidgetConfigPanel.jsx';
@@ -22,11 +23,14 @@ export default function DashboardView() {
     updateDashboard, refreshList, openDashboard,
   } = useDashboard();
   const { pvwsClient, devices } = useApp();
+  const { gitStorage, canSync, canWrite } = useGitStorage();
 
   const [showPicker, setShowPicker] = useState(false);
   const [configWidget, setConfigWidget] = useState(null);
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [gitRef, setGitRef] = useState(null); // sha/blob_id for conflict detection
 
   const layout = useMemo(() => {
     if (!activeDashboard) return [];
@@ -115,6 +119,84 @@ export default function DashboardView() {
     input.click();
   };
 
+  /** Push the current dashboard to the beamline git repository. */
+  const handleSyncToGit = async () => {
+    if (!canSync || !activeDashboard) return;
+    if (!canWrite) {
+      alert('Login with a personal access token in Settings to push dashboards to git.');
+      return;
+    }
+    const name = activeDashboard.name || 'untitled';
+    setSyncing(true);
+    try {
+      // 1. Check for remote changes before pushing
+      const check = await gitStorage.checkDashboardConflict(name, gitRef);
+      if (check.conflict) {
+        const action = prompt(
+          `Remote dashboard "${name}" has been modified since your last load/push.\n\n` +
+          `Choose an action:\n` +
+          `  1 — Overwrite remote with your local version\n` +
+          `  2 — Load remote version (discard local changes)\n` +
+          `  3 — Cancel\n\n` +
+          `Enter 1, 2, or 3:`
+        );
+        if (action === '2') {
+          const data = check.remoteData;
+          data.id = generateId();
+          updateDashboard(data);
+          refreshList();
+          openDashboard(data.id);
+          setGitRef(check.remoteRef);
+          alert(`Loaded remote version of "${name}".`);
+          return;
+        }
+        if (action !== '1') return; // Cancel
+        // action === '1': proceed to overwrite, using remoteRef for the push
+      }
+      // 2. Ask for commit message
+      const msg = prompt('Commit message:', `Update dashboard: ${name}`);
+      if (!msg) return;
+      // 3. Push with the correct remote ref
+      const result = await gitStorage.saveDashboard(name, activeDashboard, msg, check.remoteRef || gitRef);
+      setGitRef(result?.content?.sha || result?.file_path || null);
+      alert(`Dashboard "${name}" pushed to git.`);
+    } catch (err) {
+      console.error('[GitSync] Dashboard push failed:', err);
+      alert(`Git push failed: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  /** Load a dashboard from the beamline git repository. */
+  const handleLoadFromGit = async () => {
+    if (!canSync) return;
+    setSyncing(true);
+    try {
+      const list = await gitStorage.listDashboards();
+      if (list.length === 0) {
+        alert('No dashboards found in git repository.');
+        return;
+      }
+      const names = list.map(l => l.name);
+      const choice = prompt(`Available dashboards:\n${names.map((n, i) => `  ${i + 1}. ${n}`).join('\n')}\n\nEnter name to load:`);
+      if (!choice) return;
+      const { data, ref } = await gitStorage.loadDashboard(choice.trim());
+      data.id = generateId();
+      updateDashboard(data);
+      refreshList();
+      openDashboard(data.id);
+      setGitRef(ref);
+      const count = Array.isArray(data.widgets) ? data.widgets.length : 0;
+      alert(`Loaded dashboard "${data.name || choice}" from git (${count} widget${count === 1 ? '' : 's'})`);
+    } catch (err) {
+      console.error('[GitSync] Dashboard load failed:', err);
+      alert(`Failed to load from git: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const startRename = () => {
     setNameInput(activeDashboard?.name || '');
     setRenaming(true);
@@ -184,6 +266,16 @@ export default function DashboardView() {
           <button className="toolbar-btn" onClick={handleImport} title="Import dashboard JSON">
             ⬆ Import
           </button>
+          {canSync && (
+            <>
+              <button className="toolbar-btn" onClick={handleSyncToGit} disabled={syncing || !canWrite} title={canWrite ? 'Push dashboard to git' : 'Login with a PAT in Settings to push to git'}>
+                {syncing ? '⏳' : '☁️'} Sync
+              </button>
+              <button className="toolbar-btn" onClick={handleLoadFromGit} disabled={syncing} title="Load dashboard from git">
+                ☁️ Load
+              </button>
+            </>
+          )}
           <span className="toolbar-divider" />
           <span className="widget-count">{activeDashboard.widgets.length} widgets</span>
         </div>

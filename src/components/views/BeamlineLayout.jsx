@@ -38,6 +38,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { useApp } from '../../context/AppContext.jsx';
+import { useGitStorage } from '../../hooks/useGitStorage.js';
 import { getGlyph, GLYPH_TYPES, STATUS_COLORS } from '../glyphs/DeviceGlyphs.jsx';
 import { usePv } from '../../hooks/usePv.js';
 import { deviceToWidgetType, getWidgetComponent } from '../../widgets/registry.js';
@@ -147,10 +148,29 @@ function getCategoryForGlyph(glyphType) {
   return custom?.category || 'infra';
 }
 
+// ─── Helper: map beamline glyphType to widget family code ──────────────
+const GLYPH_TO_FAMILY = {
+  camera: 'cam',
+  flag: 'mot',
+  bpm: 'bpm',
+  bcm: 'generic',
+  'vacuum-gauge': 'vac',
+  'vacuum-valve': 'vac',
+  solenoid: 'mag',
+  corrector: 'mag',
+  quadrupole: 'mag',
+  dipole: 'mag',
+  'rf-cavity': 'rf',
+  'turbo-pump': 'generic',
+  'electron-gun': 'generic',
+  io: 'io',
+};
+
 // ─── Helper: resolve devices array from node data (backward compat) ─────
 function resolveDevices(data) {
   if (data.devices?.length > 0) return data.devices;
   if (data.deviceId) return [{ id: data.deviceId, name: data.label, pvPrefix: data.pvPrefix, family: data.family, iocName: data.sublabel }];
+  if (data.pvPrefix) return [{ id: data.id, name: data.label, pvPrefix: data.pvPrefix, family: data.family || GLYPH_TO_FAMILY[data.glyphType] || 'generic', iocName: data.sublabel }];
   return [];
 }
 
@@ -242,20 +262,28 @@ function AnnotationNode({ data }) {
   );
 }
 
-// ─── Group / Module Node (transparent container) ────────────────────────
+// ─── Group / Module Node (transparent container, optional glyph+handles) ──
 
 function GroupNode({ data }) {
   const shape = data.shape || 'rect';
   const dashed = data.dashed !== false;
+  const hasGlyph = !!data.glyphType;
+  const GlyphComp = hasGlyph ? getGlyph(data.glyphType) : null;
+  const glyphSize = data.glyphSize || 28;
   return (
-    <div className="bll-group" style={{
+    <div className={`bll-group${hasGlyph ? ' bll-group--device' : ''}`} style={{
       width: data.width || 300,
       height: data.height || 200,
       borderColor: data.borderColor || '#555',
       borderStyle: dashed ? 'dashed' : 'solid',
       borderRadius: shape === 'oval' ? '50%' : shape === 'rounded' ? '16px' : '4px',
     }}>
-      <div className="bll-group-label">{data.label || 'Module'}</div>
+      {hasGlyph && <Handle type="target" position={Position.Left} className="bll-handle" />}
+      <div className="bll-group-label">
+        {GlyphComp && <GlyphComp status="ok" size={glyphSize} />}
+        {data.label || 'Module'}
+      </div>
+      {hasGlyph && <Handle type="source" position={Position.Right} className="bll-handle" />}
     </div>
   );
 }
@@ -463,7 +491,7 @@ function NodePropsModal({ node, allDevices, allNodes, onSave, onCancel }) {
 
   // Multi-device management
   const [deviceSearch, setDeviceSearch] = useState('');
-  const linkedDevices = props.devices || resolveDevices(props);
+  const linkedDevices = props.devices?.length > 0 ? props.devices : resolveDevices(props);
 
   const removeDevice = (devId) => {
     const newDevices = linkedDevices.filter(d => d.id !== devId);
@@ -758,7 +786,7 @@ function ContextMenu({ x, y, items, onClose }) {
 
 // ─── Layout Manager Modal ───────────────────────────────────────────────
 
-function LayoutManagerModal({ beamline, currentLayout, onLoad, onNew, onClose }) {
+function LayoutManagerModal({ beamline, currentLayout, onLoad, onNew, onClose, gitLayouts, onLoadFromGit }) {
   const layouts = listLayouts(beamline);
   const [newName, setNewName] = useState('');
   const [renaming, setRenaming] = useState(null);
@@ -805,27 +833,50 @@ function LayoutManagerModal({ beamline, currentLayout, onLoad, onNew, onClose })
               + Create
             </button>
           </div>
-          <div className="bll-lm-list">
-            {layouts.length === 0 && <div className="bll-picker-empty">No saved layouts yet</div>}
-            {layouts.map(l => (
-              <div key={l.name} className={`bll-lm-item ${l.name === currentLayout ? 'active' : ''}`}>
-                {renaming === l.name ? (
-                  <input className="settings-input bll-lm-rename" value={renameValue} autoFocus
-                    onChange={e => setRenameValue(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleRename(l.name)}
-                    onBlur={() => handleRename(l.name)} />
-                ) : (
-                  <button className="bll-lm-name" onClick={() => onLoad(l.name)}>
-                    <span>{l.name}</span>
-                    <span className="bll-lm-meta">{l.nodeCount} elements</span>
-                  </button>
-                )}
-                <div className="bll-lm-actions">
-                  <button className="bl-btn bl-btn--sm" onClick={() => { setRenaming(l.name); setRenameValue(l.name); }} title="Rename">✎</button>
-                  <button className="bl-btn bl-btn--sm" onClick={() => handleDelete(l.name)} title="Delete">🗑</button>
-                </div>
+
+          {/* Git remote layouts */}
+          {gitLayouts && gitLayouts.length > 0 && (
+            <div className="bll-lm-section">
+              <div className="bll-lm-section-title">☁️ Git Repository</div>
+              <div className="bll-lm-list">
+                {gitLayouts.map(l => (
+                  <div key={l.name} className="bll-lm-item">
+                    <button className="bll-lm-name" onClick={() => onLoadFromGit(l.name)}>
+                      <span>☁️ {l.name}</span>
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Local layouts */}
+          <div className="bll-lm-section">
+            {gitLayouts && gitLayouts.length > 0 && (
+              <div className="bll-lm-section-title">💾 Local</div>
+            )}
+            <div className="bll-lm-list">
+              {layouts.length === 0 && <div className="bll-picker-empty">No saved layouts yet</div>}
+              {layouts.map(l => (
+                <div key={l.name} className={`bll-lm-item ${l.name === currentLayout ? 'active' : ''}`}>
+                  {renaming === l.name ? (
+                    <input className="settings-input bll-lm-rename" value={renameValue} autoFocus
+                      onChange={e => setRenameValue(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleRename(l.name)}
+                      onBlur={() => handleRename(l.name)} />
+                  ) : (
+                    <button className="bll-lm-name" onClick={() => onLoad(l.name)}>
+                      <span>{l.name}</span>
+                      <span className="bll-lm-meta">{l.nodeCount} elements</span>
+                    </button>
+                  )}
+                  <div className="bll-lm-actions">
+                    <button className="bl-btn bl-btn--sm" onClick={() => { setRenaming(l.name); setRenameValue(l.name); }} title="Rename">✎</button>
+                    <button className="bl-btn bl-btn--sm" onClick={() => handleDelete(l.name)} title="Delete">🗑</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -956,6 +1007,7 @@ function CustomGlyphModal({ onClose, onSave }) {
 
 function LayoutEditor() {
   const { config, devices, pvwsClient, zones } = useApp();
+  const { gitStorage, canSync, canWrite } = useGitStorage();
   const beamline = config?.beamline || 'default';
   const reactFlowWrapper = useRef(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -966,12 +1018,19 @@ function LayoutEditor() {
   const [showPalette, setShowPalette] = useState(true);
   const [selectedZone, setSelectedZone] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [gitDirty, setGitDirty] = useState(false);
+  const markDirty = useCallback(() => { setDirty(true); setGitDirty(true); }, []);
   const [detailDevices, setDetailDevices] = useState(null);
   const [currentLayout, setCurrentLayout] = useState(null);
   const [customGlyphVersion, setCustomGlyphVersion] = useState(0);
   const [schematicView, setSchematicView] = useState(false);
   const [clipboard, setClipboard] = useState([]);
   const [contextMenu, setContextMenu] = useState(null);
+
+  // Git sync state
+  const [syncing, setSyncing] = useState(false);
+  const [gitRef, setGitRef] = useState(null); // sha/blob_id for optimistic locking
+  const [gitLayouts, setGitLayouts] = useState([]); // remote layout list
 
   // Modals
   const [pickerOpen, setPickerOpen] = useState(null);
@@ -1036,7 +1095,7 @@ function LayoutEditor() {
       const removedIds = new Set(selected.map(n => n.id));
       return eds.filter(e => !removedIds.has(e.source) && !removedIds.has(e.target));
     });
-    setDirty(true);
+    markDirty();
   }, [nodes, setNodes, setEdges]);
 
   const handlePaste = useCallback(() => {
@@ -1055,10 +1114,27 @@ function LayoutEditor() {
       };
     });
     setNodes(nds => [...nds, ...newNodes]);
-    setDirty(true);
+    markDirty();
   }, [clipboard, setNodes]);
 
   // ─── Layout management ───────────────────────────────────────────
+
+  /** Build the export-format JSON data from current nodes/edges. */
+  const buildExportData = useCallback(() => ({
+    beamline,
+    layout: currentLayout || 'untitled',
+    elements: nodes.map(n => ({
+      id: n.id, type: n.type,
+      parentId: n.parentId,
+      devices: resolveDevices(n.data),
+      label: n.data.label,
+      glyphType: n.data.glyphType,
+      x: Math.round(n.position.x),
+      y: Math.round(n.position.y),
+      ...n.data,
+    })),
+    connections: edges.map(e => ({ from: e.source, to: e.target })),
+  }), [beamline, currentLayout, nodes, edges]);
 
   const handleSave = useCallback(() => {
     if (!currentLayout) {
@@ -1071,6 +1147,125 @@ function LayoutEditor() {
     }
     setDirty(false);
   }, [beamline, currentLayout, nodes, edges]);
+
+  /** Helper: import remote layout data into the editor. */
+  const importRemoteLayout = useCallback((data, ref, name) => {
+    const imported = (data.elements || []).map(el => ({
+      id: el.id || `el-${Math.random().toString(36).slice(2, 8)}`,
+      type: el.type || 'device',
+      position: { x: el.x || 0, y: el.y || 0 },
+      parentId: el.parentId || undefined,
+      ...(el.type === 'group'
+        ? { style: { width: el.width || 200, height: el.height || 150 } }
+        : {}),
+      data: { ...el },
+    }));
+    const importedEdges = (data.connections || []).map((c, i) => ({
+      id: `e-git-${i}`,
+      source: c.from,
+      target: c.to,
+      type: 'default',
+      style: { stroke: '#4488ff', strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#4488ff' },
+    }));
+    setNodes(imported);
+    setEdges(importedEdges);
+    setGitRef(ref);
+    saveNamedLayout(beamline, name, { nodes: imported, edges: importedEdges });
+    setDirty(false);
+    setGitDirty(false);
+  }, [beamline, setNodes, setEdges]);
+
+  /** Sync with git: check remote first, then push only if local changes exist. */
+  const handleSyncToGit = useCallback(async () => {
+    if (!canSync || !currentLayout) return;
+    if (!canWrite) {
+      alert('Login with a personal access token in Settings to push layouts to git.');
+      return;
+    }
+    setSyncing(true);
+    try {
+      // 1. Always check remote first
+      const check = await gitStorage.checkLayoutConflict(currentLayout, gitRef);
+
+      // 2. Remote changed — handle conflict
+      if (check.conflict) {
+        if (!gitDirty) {
+          // No local modifications — just pull the remote version
+          importRemoteLayout(check.remoteData, check.remoteRef, currentLayout);
+          alert(`Layout "${currentLayout}" updated from git (remote had changes).`);
+          return;
+        }
+        // Local modifications exist AND remote changed — ask the user
+        const action = prompt(
+          `Remote layout "${currentLayout}" has been modified since your last sync, and you have local changes.\n\n` +
+          `Choose an action:\n` +
+          `  1 — Overwrite remote with your local version\n` +
+          `  2 — Load remote version (discard local changes)\n` +
+          `  3 — Cancel\n\n` +
+          `Enter 1, 2, or 3:`
+        );
+        if (action === '2') {
+          importRemoteLayout(check.remoteData, check.remoteRef, currentLayout);
+          alert(`Loaded remote version of "${currentLayout}".`);
+          return;
+        }
+        if (action !== '1') return; // Cancel
+      }
+
+      // 3. No local changes pending — nothing to push
+      if (!gitDirty) {
+        alert(`Layout "${currentLayout}" is up to date — no local changes to push.`);
+        return;
+      }
+
+      // 4. Local changes exist — ask for commit message and push
+      const msg = prompt('Commit message:', `Update layout: ${currentLayout}`);
+      if (!msg) return;
+      const data = buildExportData();
+      const result = await gitStorage.saveLayout(currentLayout, data, msg, check.remoteRef || gitRef);
+      setGitRef(result?.content?.sha || result?.file_path || null);
+      saveNamedLayout(beamline, currentLayout, { nodes, edges });
+      setDirty(false);
+      setGitDirty(false);
+      alert(`Layout "${currentLayout}" pushed to git.`);
+    } catch (err) {
+      console.error('[GitSync] Push failed:', err);
+      alert(`Git push failed: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [canSync, canWrite, gitStorage, currentLayout, buildExportData, gitRef, gitDirty, beamline, nodes, edges, importRemoteLayout]);
+
+  /** Fetch layout list from the remote git repository. */
+  const refreshGitLayouts = useCallback(async () => {
+    if (!canSync) return;
+    try {
+      const list = await gitStorage.listLayouts();
+      setGitLayouts(list);
+    } catch (err) {
+      console.warn('[GitSync] Failed to list remote layouts:', err);
+    }
+  }, [canSync, gitStorage]);
+
+  /** Load a layout from the git repository by name. */
+  const handleLoadFromGit = useCallback(async (name) => {
+    if (!canSync) return;
+    if (dirty && !confirm('Discard unsaved changes?')) return;
+    setSyncing(true);
+    try {
+      const { data, ref } = await gitStorage.loadLayout(name);
+      importRemoteLayout(data, ref, name);
+      setCurrentLayout(name);
+      setLayoutManagerOpen(false);
+    } catch (err) {
+      console.error('[GitSync] Load failed:', err);
+      alert(`Failed to load layout from git: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [canSync, gitStorage, dirty, importRemoteLayout]);
+
 
   const handleLoadLayout = useCallback((name) => {
     if (dirty && !confirm('Discard unsaved changes?')) return;
@@ -1096,13 +1291,13 @@ function LayoutEditor() {
       style: { stroke: '#4488ff', strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#4488ff' },
     }, eds));
-    setDirty(true);
+    markDirty();
   }, [setEdges]);
 
   // ─── Node drag stop: reparent into/out of groups ─────────────────
 
   const onNodeDragStop = useCallback((event, draggedNode) => {
-    setDirty(true);
+    markDirty();
     if (draggedNode.type === 'group') return;
 
     setNodes(nds => {
@@ -1163,21 +1358,7 @@ function LayoutEditor() {
   // ─── Export / Import ─────────────────────────────────────────────
 
   const handleExport = useCallback(() => {
-    const data = {
-      beamline,
-      layout: currentLayout || 'untitled',
-      elements: nodes.map(n => ({
-        id: n.id, type: n.type,
-        parentId: n.parentId,
-        devices: resolveDevices(n.data),
-        label: n.data.label,
-        glyphType: n.data.glyphType,
-        x: Math.round(n.position.x),
-        y: Math.round(n.position.y),
-        ...n.data,
-      })),
-      connections: edges.map(e => ({ from: e.source, to: e.target })),
-    };
+    const data = buildExportData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1185,7 +1366,7 @@ function LayoutEditor() {
     a.download = `beamline-layout-${currentLayout || 'untitled'}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [beamline, currentLayout, nodes, edges]);
+  }, [buildExportData, currentLayout]);
 
   const handleImport = useCallback(() => {
     const input = document.createElement('input');
@@ -1263,7 +1444,7 @@ function LayoutEditor() {
 
           setNodes(imported);
           setEdges(importedEdges);
-          setDirty(true);
+          markDirty();
           console.info('[BeamlineLayoutImport] Imported:', {
             file: file.name,
             nodeCount: imported.length,
@@ -1326,7 +1507,7 @@ function LayoutEditor() {
       id, type: typeMap[shapeType] || 'shape-rect', position,
       data: { ...dataDefaults[shapeType] },
     }]);
-    setDirty(true);
+    markDirty();
   }, [setNodes]);
 
   const addAnnotationAt = useCallback((annotationType, position) => {
@@ -1344,7 +1525,7 @@ function LayoutEditor() {
         data: { label: text, annotationType: 'label', fontSize: 14, color: '#aaa', rotation: 0 },
       }]);
     }
-    setDirty(true);
+    markDirty();
   }, [setNodes]);
 
   const addGroupAt = useCallback((position) => {
@@ -1356,7 +1537,7 @@ function LayoutEditor() {
       data: { label, width: 300, height: 200, shape: 'rounded', dashed: true },
       style: { zIndex: -1 },
     }]);
-    setDirty(true);
+    markDirty();
   }, [setNodes]);
 
   const addDeviceAt = useCallback((dev, position) => {
@@ -1373,7 +1554,7 @@ function LayoutEditor() {
         width: 90, height: 60, rotation: 0,
       },
     }]);
-    setDirty(true);
+    markDirty();
   }, [setNodes]);
 
   const handlePaletteClick = useCallback((glyphType, label) => {
@@ -1397,7 +1578,7 @@ function LayoutEditor() {
       },
     }]);
     setPickerOpen(null);
-    setDirty(true);
+    markDirty();
   }, [setNodes, pickerOpen]);
 
   const placeUnlinked = useCallback(() => {
@@ -1416,7 +1597,7 @@ function LayoutEditor() {
       },
     }]);
     setPickerOpen(null);
-    setDirty(true);
+    markDirty();
   }, [setNodes, pickerOpen]);
 
   // ─── Delete + Rotate selected ────────────────────────────────────
@@ -1424,7 +1605,7 @@ function LayoutEditor() {
   const deleteSelected = useCallback(() => {
     setNodes(nds => nds.filter(n => !n.selected));
     setEdges(eds => eds.filter(e => !e.selected));
-    setDirty(true);
+    markDirty();
   }, [setNodes, setEdges]);
 
   const rotateSelected = useCallback((degrees) => {
@@ -1433,7 +1614,7 @@ function LayoutEditor() {
       const cur = n.data.rotation || 0;
       return { ...n, data: { ...n.data, rotation: (cur + degrees + 360) % 360 } };
     }));
-    setDirty(true);
+    markDirty();
   }, [setNodes]);
 
   // ─── Right-click context menu ────────────────────────────────────
@@ -1471,7 +1652,7 @@ function LayoutEditor() {
               };
             });
           });
-          setDirty(true);
+          markDirty();
         }
       });
     }
@@ -1500,7 +1681,8 @@ function LayoutEditor() {
     if (!editMode) {
       if (node.type === 'device') {
         const devs = resolveDevices(node.data);
-        const resolved = devs.map(d => devices.find(dev => dev.id === d.id)).filter(Boolean);
+        // Try catalogue lookup first; fall back to synthesized device entries (pvPrefix on element)
+        const resolved = devs.map(d => devices.find(dev => dev.id === d.id) || d).filter(d => d.pvPrefix || d.family);
         if (resolved.length > 0) setDetailDevices(resolved);
       } else if (node.type === 'group') {
         // Collect all device nodes that are children of this group
@@ -1509,8 +1691,8 @@ function LayoutEditor() {
         const seenIds = new Set();
         childDevNodes.forEach(n => {
           resolveDevices(n.data).forEach(d => {
-            const full = devices.find(dev => dev.id === d.id);
-            if (full && !seenIds.has(full.id)) { allDevs.push(full); seenIds.add(full.id); }
+            const full = devices.find(dev => dev.id === d.id) || d;
+            if ((full.pvPrefix || full.family) && !seenIds.has(full.id)) { allDevs.push(full); seenIds.add(full.id); }
           });
         });
         if (allDevs.length > 0) setDetailDevices(allDevs);
@@ -1522,7 +1704,7 @@ function LayoutEditor() {
     if (!editMode) {
       if (node.type === 'device') {
         const devs = resolveDevices(node.data);
-        const resolved = devs.map(d => devices.find(dev => dev.id === d.id)).filter(Boolean);
+        const resolved = devs.map(d => devices.find(dev => dev.id === d.id) || d).filter(d => d.pvPrefix || d.family);
         if (resolved.length > 0) { setDetailDevices(resolved); return; }
       }
     }
@@ -1534,7 +1716,7 @@ function LayoutEditor() {
   const saveNodeProps = useCallback((newData) => {
     setNodes(nds => nds.map(n => n.id === propsNode.id ? { ...n, data: { ...n.data, ...newData } } : n));
     setPropsNode(null);
-    setDirty(true);
+    markDirty();
   }, [propsNode, setNodes]);
 
   // ─── Computed ────────────────────────────────────────────────────
@@ -1623,6 +1805,18 @@ function LayoutEditor() {
           )}
           <button className="bl-btn bl-btn--sm" onClick={handleImport} title="Import layout">📥 Import</button>
           <button className="bl-btn bl-btn--sm" onClick={handleExport} title="Export layout">📤 Export</button>
+          {canSync && (
+            <button className="bl-btn bl-btn--sm" onClick={handleSyncToGit} disabled={syncing || !currentLayout || !canWrite}
+              title={canWrite ? 'Push layout to git repository' : 'Login with a PAT in Settings to push to git'}>
+              {syncing ? '⏳' : '☁️'} Sync
+            </button>
+          )}
+          {canSync && (
+            <button className="bl-btn bl-btn--sm" onClick={async () => { await refreshGitLayouts(); setLayoutManagerOpen(true); }}
+              title="Load layout from git repository">
+              ☁️ Load
+            </button>
+          )}
           <button className="bl-btn bl-btn--sm bl-btn--primary" onClick={handleSave} disabled={!dirty}>
             💾 Save{dirty ? ' *' : ''}
           </button>
@@ -1821,7 +2015,8 @@ function LayoutEditor() {
       {layoutManagerOpen && (
         <LayoutManagerModal beamline={beamline} currentLayout={currentLayout}
           onLoad={handleLoadLayout} onNew={handleNewLayout}
-          onClose={() => setLayoutManagerOpen(false)} />
+          onClose={() => setLayoutManagerOpen(false)}
+          gitLayouts={gitLayouts} onLoadFromGit={handleLoadFromGit} />
       )}
 
       {/* Device picker modal */}

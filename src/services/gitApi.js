@@ -107,6 +107,9 @@ export async function getFile(repoInfo, filePath, branch, token) {
  * Returns the commit info from the API.
  */
 export async function commitFile(repoInfo, filePath, branch, content, commitMessage, token, existingRef) {
+  if (!token) {
+    throw new Error('Authentication required — please log in with a personal access token');
+  }
   if (repoInfo.platform === 'github') {
     return commitFileGitHub(repoInfo, filePath, branch, content, commitMessage, token, existingRef);
   }
@@ -122,6 +125,9 @@ export async function commitFile(repoInfo, filePath, branch, content, commitMess
  * @param {string} token - PAT
  */
 export async function commitFiles(repoInfo, files, branch, commitMessage, token) {
+  if (!token) {
+    throw new Error('Authentication required — please log in with a personal access token');
+  }
   if (repoInfo.platform === 'github') {
     return commitFilesGitHub(repoInfo, files, branch, commitMessage, token);
   }
