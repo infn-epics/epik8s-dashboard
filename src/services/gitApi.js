@@ -7,7 +7,7 @@
  *   - commitFile: create or update a file via a commit
  */
 
-import { proxyUrl, gitProxyFetch } from './devProxy.js';
+import { proxyUrl } from './devProxy.js';
 
 /**
  * Build a raw (unauthenticated) download URL for a file in a repository.
@@ -48,15 +48,19 @@ export async function fetchFileFromGit(repoInfo, filePath, branch = 'main', toke
     }
   }
 
-  // Public raw URL fallback — routed through the k8s-backend git-proxy in
-  // production to avoid CORS restrictions on GitLab/GitHub raw endpoints.
-  const rawUrl = buildRawUrl(repoInfo, filePath, branch);
-  const resp = await gitProxyFetch(rawUrl, token || null);
-  if (resp.status === 401 || resp.status === 403) {
-    throw new Error('Authentication required — please log in with a personal access token');
+  // No token provided — try the REST API without authentication.
+  // For public repos, the GitLab/GitHub REST API supports CORS from the browser
+  // (unlike raw file URLs which have no CORS headers).
+  try {
+    const { content } = await getFile(repoInfo, filePath, branch, '');
+    return content;
+  } catch (apiErr) {
+    const msg = String(apiErr.message);
+    if (msg.includes('401') || msg.includes('403')) {
+      throw new Error('Authentication required — please log in with a personal access token');
+    }
+    throw new Error(`Cannot fetch ${filePath} from repository: ${msg}`);
   }
-  if (!resp.ok) throw new Error(`Cannot fetch ${filePath} from repository (HTTP ${resp.status})`);
-  return resp.text();
 }
 
 /**
@@ -130,9 +134,9 @@ async function getFileGitLab({ host, projectPath }, filePath, branch, token) {
   const projectId = encodeURIComponent(projectPath);
   const encodedPath = encodeURIComponent(filePath);
   const url = `https://${host}/api/v4/projects/${projectId}/repository/files/${encodedPath}?ref=${encodeURIComponent(branch)}`;
-  const resp = await fetch(proxyUrl(url), {
-    headers: { 'PRIVATE-TOKEN': token },
-  });
+  const headers = {};
+  if (token) headers['PRIVATE-TOKEN'] = token;
+  const resp = await fetch(proxyUrl(url), { headers });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`GitLab GET file failed (${resp.status}): ${text}`);
@@ -177,12 +181,9 @@ async function commitFileGitLab({ host, projectPath }, filePath, branch, content
 
 async function getFileGitHub({ projectPath }, filePath, branch, token) {
   const url = `https://api.github.com/repos/${projectPath}/contents/${filePath}?ref=${encodeURIComponent(branch)}`;
-  const resp = await fetch(proxyUrl(url), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-    },
-  });
+  const headers = { Accept: 'application/vnd.github.v3+json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const resp = await fetch(proxyUrl(url), { headers });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`GitHub GET file failed (${resp.status}): ${text}`);
