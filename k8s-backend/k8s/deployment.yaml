@@ -18,7 +18,7 @@ spec:
       serviceAccountName: epik8s-backend
       containers:
         - name: backend
-          image: epik8s-backend:latest  # Replace with your registry image
+          image: ghcr.io/infn-epics/epik8s-dashboard/k8s-backend:latest
           ports:
             - containerPort: 3001
               name: http
