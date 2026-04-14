@@ -7,7 +7,7 @@
  *   - commitFile: create or update a file via a commit
  */
 
-import { proxyUrl } from './devProxy.js';
+import { proxyUrl, gitProxyFetch } from './devProxy.js';
 
 /**
  * Build a raw (unauthenticated) download URL for a file in a repository.
@@ -48,9 +48,10 @@ export async function fetchFileFromGit(repoInfo, filePath, branch = 'main', toke
     }
   }
 
-  // Public raw URL fallback
-  const rawUrl = proxyUrl(buildRawUrl(repoInfo, filePath, branch));
-  const resp = await fetch(rawUrl);
+  // Public raw URL fallback — routed through the k8s-backend git-proxy in
+  // production to avoid CORS restrictions on GitLab/GitHub raw endpoints.
+  const rawUrl = buildRawUrl(repoInfo, filePath, branch);
+  const resp = await gitProxyFetch(rawUrl, token || null);
   if (resp.status === 401 || resp.status === 403) {
     throw new Error('Authentication required — please log in with a personal access token');
   }

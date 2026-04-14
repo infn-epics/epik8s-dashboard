@@ -196,6 +196,66 @@ function emitSystemEvent(action, resource, name, extra = {}) {
   }
 }
 
+// ─── Git proxy (CORS-free file fetch for browser clients) ───────────────
+//
+// GET /api/v1/git-proxy?url=<encoded_url>
+// Optional header  X-Git-Token: <PAT>
+//
+// The browser cannot fetch raw GitLab/GitHub files directly because those
+// servers don't set Access-Control-Allow-Origin.  This endpoint fetches the
+// URL server-side (no CORS restriction) and relays the response back to the
+// browser.  Only http/https URLs are accepted.
+
+app.get('/api/v1/git-proxy', async (req, res, next) => {
+  try {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).json({ error: 'Missing ?url= parameter' });
+
+    let parsed;
+    try { parsed = new URL(targetUrl); } catch {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return res.status(400).json({ error: 'Only http/https URLs allowed' });
+    }
+
+    const token = req.headers['x-git-token'];
+    const headers = { 'User-Agent': 'epik8s-backend/1.0', 'Accept': 'text/plain, */*' };
+    if (token) {
+      // GitLab PAT
+      headers['PRIVATE-TOKEN'] = token;
+      // GitHub PAT
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 15000);
+    let upstream;
+    try {
+      upstream = await fetch(targetUrl, { headers, signal: ctrl.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (upstream.status === 401 || upstream.status === 403) {
+      return res.status(upstream.status).json({ error: 'Authentication required' });
+    }
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({ error: `Upstream HTTP ${upstream.status}` });
+    }
+
+    const text = await upstream.text();
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(text);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ error: 'Upstream request timed out' });
+    }
+    next(err);
+  }
+});
+
 // ─── Health ─────────────────────────────────────────────────────────────
 
 app.get('/healthz', (_req, res) => {
