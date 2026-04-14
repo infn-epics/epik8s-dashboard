@@ -1,7 +1,7 @@
 {
   "name": "react-epik8s-dashboard",
   "private": false,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "description": "EPIK8s Dashboard - Configuration-driven web application for EPICS control systems with camera arrays, instrumentation control, and beamline overview",
   "author": "Andrea Michelotti",

@@ -8,6 +8,7 @@ import Sidebar from './Sidebar.jsx';
 import ChatConsole from '../consoles/ChatConsole.jsx';
 import SystemConsole from '../consoles/SystemConsole.jsx';
 import CertWarningBanner from '../common/CertWarningBanner.jsx';
+import { version as APP_VERSION, author as APP_AUTHOR } from '../../../package.json';
 
 /**
  * AppShell — professional layout with grouped navbar, console panels, sidebar.
@@ -119,6 +120,12 @@ export default function AppShell({ children, theme, onToggleTheme }) {
         <div className="navbar-brand">
           <span className="navbar-logo">⚛</span>
           <span className="navbar-title">{dashboardTitle}</span>
+          <span
+            className="navbar-version"
+            title={`EPIK8s Dashboard v${APP_VERSION} — ${APP_AUTHOR}`}
+          >
+            v{APP_VERSION}
+          </span>
         </div>
 
         <nav className="navbar-nav" ref={dropdownRef}>

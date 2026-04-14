@@ -96,6 +96,20 @@ body,
   white-space: nowrap;
 }
 
+.navbar-version {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted, #6b7280);
+  background: var(--bg-tertiary, rgba(255,255,255,0.07));
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  cursor: default;
+  align-self: center;
+}
+
 .navbar-nav {
   display: flex;
   gap: 4px;
@@ -6051,6 +6065,16 @@ body,
   color: #888;
   background: #0e0e1a;
   padding: 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bll-group--device {
+  cursor: pointer;
+}
+.bll-group--device .bll-group-label svg {
+  flex-shrink: 0;
 }
 
 /* ─── Legend ──────────────────────────────────────────────────── */
@@ -6216,6 +6240,20 @@ body,
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.bll-lm-section {
+  margin-bottom: 12px;
+}
+
+.bll-lm-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  padding: 0 4px;
 }
 
 .bll-lm-item {
