@@ -174,6 +174,40 @@ function resolveDevices(data) {
   return [];
 }
 
+function toHandlePosition(value, fallback) {
+  switch (String(value || '').toLowerCase()) {
+    case 'left': return Position.Left;
+    case 'right': return Position.Right;
+    case 'top': return Position.Top;
+    case 'bottom': return Position.Bottom;
+    default: return fallback;
+  }
+}
+
+function getAutoHandlePositions(angle = 0) {
+  const normalized = ((Number(angle) % 360) + 360) % 360;
+
+  if (normalized >= 45 && normalized < 135) {
+    return { target: Position.Top, source: Position.Bottom };
+  }
+  if (normalized >= 135 && normalized < 225) {
+    return { target: Position.Right, source: Position.Left };
+  }
+  if (normalized >= 225 && normalized < 315) {
+    return { target: Position.Bottom, source: Position.Top };
+  }
+  return { target: Position.Left, source: Position.Right };
+}
+
+function resolveHandlePositions(data = {}) {
+  const angle = data.rotation ?? data.nodeRotation ?? data.glyphRotation ?? 0;
+  const auto = getAutoHandlePositions(angle);
+  return {
+    target: toHandlePosition(data.targetPosition, auto.target),
+    source: toHandlePosition(data.sourcePosition, auto.source),
+  };
+}
+
 // ─── Device Node Component ──────────────────────────────────────────────
 
 function DeviceNode({ data }) {
@@ -190,7 +224,11 @@ function DeviceNode({ data }) {
   const isCustom = data.glyphType?.startsWith('custom-');
   const GlyphComp = isCustom ? null : getGlyph(data.glyphType || data.family || 'generic');
   const glyphSize = data.glyphSize || 36;
-  const rotation = data.rotation || 0;
+  const boxRotation = data.rotation ?? data.nodeRotation ?? data.glyphRotation ?? 0;
+  const glyphRotation = data.rotation != null || data.nodeRotation != null
+    ? (data.glyphRotation ?? 0)
+    : 0;
+  const { target: targetHandlePosition, source: sourceHandlePosition } = resolveHandlePositions(data);
   const cat = getCategoryForGlyph(data.glyphType);
   const catColors = CATEGORY_COLORS[cat] || CATEGORY_COLORS.infra;
   const showBorder = data.showBorder !== false;
@@ -216,21 +254,33 @@ function DeviceNode({ data }) {
       style={{
         minWidth: showBorder ? (data.width || 80) : undefined,
         minHeight: showBorder ? (data.height || 56) : undefined,
-        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        transform: boxRotation ? `rotate(${boxRotation}deg)` : undefined,
+        transformOrigin: 'center center',
         borderColor: showBorder ? (status === 'ok' ? catColors.border : undefined) : 'transparent',
         background: showBorder ? (status === 'ok' ? catColors.bg : undefined) : 'transparent',
       }}
       title={devices.map(d => d.name || d.pvPrefix).join(', ') || data.label}
     >
-      <Handle type="target" position={Position.Left} className="bll-handle" />
-      <div className="bll-node-glyph">{renderGlyph()}</div>
+      <Handle type="target" position={targetHandlePosition} className="bll-handle" />
+      <div
+        className="bll-node-glyph"
+        style={{
+          transform: glyphRotation ? `rotate(${glyphRotation}deg)` : undefined,
+          transformOrigin: 'center center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {renderGlyph()}
+      </div>
       <div className="bll-node-info">
         <span className="bll-node-label">{data.label}</span>
         {data.sublabel && <span className="bll-node-sublabel">{data.sublabel}</span>}
         {devices.length > 1 && <span className="bll-node-sublabel">{devices.length} devices</span>}
       </div>
       {status === 'alarm' && <span className="bll-node-alarm-badge">⚠</span>}
-      <Handle type="source" position={Position.Right} className="bll-handle" />
+      <Handle type="source" position={sourceHandlePosition} className="bll-handle" />
     </div>
   );
 }
@@ -239,14 +289,17 @@ function DeviceNode({ data }) {
 
 function AnnotationNode({ data }) {
   const rotation = data.rotation || 0;
+  const { target: targetHandlePosition, source: sourceHandlePosition } = resolveHandlePositions(data);
+
   if (data.annotationType === 'beam') {
     return (
       <div className="bll-beam-segment" style={{
         width: data.width || 120, height: 6,
         transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        transformOrigin: 'left center',
       }}>
-        <Handle type="target" position={Position.Left} className="bll-handle" />
-        <Handle type="source" position={Position.Right} className="bll-handle" />
+        <Handle type="target" position={targetHandlePosition} className="bll-handle" />
+        <Handle type="source" position={sourceHandlePosition} className="bll-handle" />
       </div>
     );
   }
@@ -256,6 +309,7 @@ function AnnotationNode({ data }) {
       color: data.color || '#aaa',
       fontWeight: data.bold ? 'bold' : 'normal',
       transform: rotation ? `rotate(${rotation}deg)` : undefined,
+      transformOrigin: 'left center',
     }}>
       {data.label || 'Label'}
     </div>
@@ -270,6 +324,12 @@ function GroupNode({ data }) {
   const hasGlyph = !!data.glyphType;
   const GlyphComp = hasGlyph ? getGlyph(data.glyphType) : null;
   const glyphSize = data.glyphSize || 28;
+  const boxRotation = data.rotation ?? data.nodeRotation ?? data.glyphRotation ?? 0;
+  const glyphRotation = data.rotation != null || data.nodeRotation != null
+    ? (data.glyphRotation ?? 0)
+    : 0;
+  const { target: targetHandlePosition, source: sourceHandlePosition } = resolveHandlePositions(data);
+
   return (
     <div className={`bll-group${hasGlyph ? ' bll-group--device' : ''}`} style={{
       width: data.width || 300,
@@ -277,13 +337,19 @@ function GroupNode({ data }) {
       borderColor: data.borderColor || '#555',
       borderStyle: dashed ? 'dashed' : 'solid',
       borderRadius: shape === 'oval' ? '50%' : shape === 'rounded' ? '16px' : '4px',
+      transform: boxRotation ? `rotate(${boxRotation}deg)` : undefined,
+      transformOrigin: 'center center',
     }}>
-      {hasGlyph && <Handle type="target" position={Position.Left} className="bll-handle" />}
+      {hasGlyph && <Handle type="target" position={targetHandlePosition} className="bll-handle" />}
       <div className="bll-group-label">
-        {GlyphComp && <GlyphComp status="ok" size={glyphSize} />}
+        {GlyphComp && (
+          <div style={{ transform: glyphRotation ? `rotate(${glyphRotation}deg)` : undefined, display: 'flex' }}>
+            <GlyphComp status="ok" size={glyphSize} />
+          </div>
+        )}
         {data.label || 'Module'}
       </div>
-      {hasGlyph && <Handle type="source" position={Position.Right} className="bll-handle" />}
+      {hasGlyph && <Handle type="source" position={sourceHandlePosition} className="bll-handle" />}
     </div>
   );
 }
@@ -296,12 +362,15 @@ function ShapeLineNode({ data }) {
   const color = data.color || '#22c55e';
   const dashed = data.dashed;
   const rotation = data.rotation || 0;
+  const { target: targetHandlePosition, source: sourceHandlePosition } = resolveHandlePositions(data);
+
   return (
     <div style={{
       width: w, height: Math.max(h, 10), position: 'relative',
       transform: rotation ? `rotate(${rotation}deg)` : undefined,
+      transformOrigin: 'left center',
     }}>
-      <Handle type="target" position={Position.Left} className="bll-handle" />
+      <Handle type="target" position={targetHandlePosition} className="bll-handle" />
       <svg width={w} height={Math.max(h, 10)} style={{ position: 'absolute', top: 0, left: 0 }}>
         <line
           x1={0} y1={Math.max(h, 10) / 2}
@@ -310,7 +379,7 @@ function ShapeLineNode({ data }) {
           strokeDasharray={dashed ? '8,4' : undefined}
         />
       </svg>
-      <Handle type="source" position={Position.Right} className="bll-handle" />
+      <Handle type="source" position={sourceHandlePosition} className="bll-handle" />
     </div>
   );
 }
@@ -375,19 +444,22 @@ function ShapeArcNode({ data }) {
   const sweep = data.sweep || 0;
   const cy = sweep === 0 ? h : 0;
   const rotation = data.rotation || 0;
+  const { target: targetHandlePosition, source: sourceHandlePosition } = resolveHandlePositions(data);
+
   return (
     <div style={{
       width: w, height: h,
       transform: rotation ? `rotate(${rotation}deg)` : undefined,
+      transformOrigin: 'left center',
     }}>
-      <Handle type="target" position={Position.Left} className="bll-handle" />
+      <Handle type="target" position={targetHandlePosition} className="bll-handle" />
       <svg width={w} height={h}>
         <path
           d={`M0,${cy} Q${w / 2},${sweep === 0 ? 0 : h * 2} ${w},${cy}`}
           fill="none" stroke={color} strokeWidth={2}
         />
       </svg>
-      <Handle type="source" position={Position.Right} className="bll-handle" />
+      <Handle type="source" position={sourceHandlePosition} className="bll-handle" />
     </div>
   );
 }
@@ -488,6 +560,10 @@ function NodePropsModal({ node, allDevices, allNodes, onSave, onCancel }) {
   const isDevice = node.type === 'device';
   const isAnnotation = node.type === 'annotation';
   const isGroup = node.type === 'group';
+  const isBeamAnnotation = isAnnotation && props.annotationType === 'beam';
+  const isConnectable = isDevice || isGroup || node.type === 'shape-line' || node.type === 'shape-arc' || isBeamAnnotation;
+  const rotationValue = props.rotation ?? props.nodeRotation ?? props.glyphRotation ?? 0;
+  const glyphRotationValue = props.glyphRotation ?? 0;
 
   // Multi-device management
   const [deviceSearch, setDeviceSearch] = useState('');
@@ -580,17 +656,49 @@ function NodePropsModal({ node, allDevices, allNodes, onSave, onCancel }) {
             </div>
           )}
 
-          {/* Rotation (all types) */}
+          {/* Rotation / orientation */}
           <div className="bl-tpl-field">
-            <label className="bl-tpl-field-label">Rotation (°)</label>
+            <label className="bl-tpl-field-label">Element Rotation (°)</label>
             <div className="bll-rotation-row">
-              <input className="settings-input" type="number" value={props.rotation || 0}
+              <input className="settings-input" type="number" value={rotationValue}
                 onChange={e => update('rotation', Number(e.target.value))} style={{ width: 80 }} />
-              <button className="bl-btn bl-btn--sm" type="button" onClick={() => update('rotation', ((props.rotation || 0) + 90) % 360)}>+90°</button>
-              <button className="bl-btn bl-btn--sm" type="button" onClick={() => update('rotation', ((props.rotation || 0) - 90 + 360) % 360)}>-90°</button>
+              <button className="bl-btn bl-btn--sm" type="button" onClick={() => update('rotation', (rotationValue + 90) % 360)}>+90°</button>
+              <button className="bl-btn bl-btn--sm" type="button" onClick={() => update('rotation', (rotationValue - 90 + 360) % 360)}>-90°</button>
               <button className="bl-btn bl-btn--sm" type="button" onClick={() => update('rotation', 0)}>Reset</button>
             </div>
           </div>
+
+          {(isDevice || isGroup) && (
+            <div className="bl-tpl-field">
+              <label className="bl-tpl-field-label">Glyph Fine Rotation (°)</label>
+              <input className="settings-input" type="number" value={glyphRotationValue}
+                onChange={e => update('glyphRotation', Number(e.target.value))} />
+            </div>
+          )}
+
+          {isConnectable && (
+            <div className="bl-tpl-field">
+              <label className="bl-tpl-field-label">Connector Anchors</label>
+              <div className="bll-rotation-row">
+                <select className="settings-input" value={props.targetPosition || ''}
+                  onChange={e => update('targetPosition', e.target.value || undefined)}>
+                  <option value="">Input: Auto</option>
+                  <option value="left">Input: Left</option>
+                  <option value="right">Input: Right</option>
+                  <option value="top">Input: Top</option>
+                  <option value="bottom">Input: Bottom</option>
+                </select>
+                <select className="settings-input" value={props.sourcePosition || ''}
+                  onChange={e => update('sourcePosition', e.target.value || undefined)}>
+                  <option value="">Output: Auto</option>
+                  <option value="left">Output: Left</option>
+                  <option value="right">Output: Right</option>
+                  <option value="top">Output: Top</option>
+                  <option value="bottom">Output: Bottom</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Width / Height */}
           {(isShape || isGroup) && props.width !== undefined && (
@@ -1611,7 +1719,7 @@ function LayoutEditor() {
   const rotateSelected = useCallback((degrees) => {
     setNodes(nds => nds.map(n => {
       if (!n.selected) return n;
-      const cur = n.data.rotation || 0;
+      const cur = n.data.rotation ?? n.data.nodeRotation ?? n.data.glyphRotation ?? 0;
       return { ...n, data: { ...n.data, rotation: (cur + degrees + 360) % 360 } };
     }));
     markDirty();
