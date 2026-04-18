@@ -50,7 +50,7 @@ class AppErrorBoundary extends Component {
 }
 
 function AppRoutes() {
-  const { loading, error, config } = useApp();
+  const { loading, error, config, resetGitConfig, gitConfig } = useApp();
   const { theme, toggleTheme } = useTheme();
 
   if (loading) {
@@ -71,6 +71,22 @@ function AppRoutes() {
           Make sure <code>values.yaml</code> is available in the public folder
           or specify <code>?values=/path/to/values.yaml</code>.
         </p>
+        {gitConfig?.giturl && (
+          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              style={{ padding: '8px 14px', cursor: 'pointer' }}
+              onClick={resetGitConfig}
+            >
+              Use local values.yaml
+            </button>
+            <span style={{ opacity: 0.8 }}>
+              Current git source: {gitConfig.giturl}
+            </span>
+            <span style={{ opacity: 0.8 }}>
+              Config path: {gitConfig.valuesPath || '/values.yaml'}
+            </span>
+          </div>
+        )}
       </div>
     );
   }

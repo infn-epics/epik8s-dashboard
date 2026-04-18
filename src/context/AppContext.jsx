@@ -57,16 +57,16 @@ export function AppProvider({ children }) {
     const params = new URLSearchParams(window.location.search);
     const pvwsParam = params.get('pvws') || '';
     const archiverParam = params.get('archiver') || '';
-    const valuesPath = params.get('values') || '/values.yaml';
+    const stored = loadStoredGitConfig();
+    const valuesPath = params.get('values') || stored.valuesPath || '/values.yaml';
 
     // Git URL can come from: ?giturl= param → localStorage → values.yaml itself
-    const stored = loadStoredGitConfig();
     const giturl   = params.get('giturl')    || stored.giturl   || '';
     const gitbranch = params.get('gitbranch') || stored.gitbranch || 'main';
     const gittoken  = params.get('gittoken')  || stored.token    || '';
 
     // Persist to localStorage if coming from query params
-    if (params.get('giturl'))    saveGitConfig(giturl, gitbranch, gittoken);
+    if (params.get('giturl') || params.get('values')) saveGitConfig(giturl, gitbranch, gittoken, valuesPath);
 
     let cancelled = false;
 
@@ -118,6 +118,50 @@ export function AppProvider({ children }) {
     };
   }, []);
 
+  /** Re-fetch the beamline configuration and reconnect clients without a full page reload. */
+  const refreshConfig = useCallback(async ({ giturl, gitbranch, token } = {}) => {
+    const params = new URLSearchParams(window.location.search);
+    const pvwsParam = params.get('pvws') || '';
+    const archiverParam = params.get('archiver') || '';
+    const stored = loadStoredGitConfig();
+    const valuesPath = params.get('values') || stored.valuesPath || '/values.yaml';
+
+    const resolvedGiturl = giturl ?? params.get('giturl') ?? stored.giturl ?? config?._giturl ?? '';
+    const resolvedBranch = gitbranch ?? params.get('gitbranch') ?? stored.gitbranch ?? config?._gitbranch ?? 'main';
+    const resolvedToken = token ?? params.get('gittoken') ?? stored.token ?? null;
+
+    const result = await loadConfig(valuesPath, {
+      giturl: resolvedGiturl,
+      gitbranch: resolvedBranch,
+      token: resolvedToken || null,
+    });
+
+    setConfig(result.config);
+    setDevices(result.devices);
+    setCameras(result.cameras);
+    setZones(result.zones);
+
+    const defaultPvws = buildPvwsUrl(pvwsParam, result.pvws);
+    const defaultArchiver = archiverParam || buildArchiverUrl(result.config) || '';
+    const storedDs = loadStoredDataSources();
+    const pvwsUrl = storedDs?.pvwsUrl || defaultPvws;
+    const archiverUrl = storedDs?.archiverUrl || defaultArchiver;
+
+    setDataSources({ pvwsUrl, archiverUrl, pvwsDefault: defaultPvws, archiverDefault: defaultArchiver });
+
+    if (pvwsRef.current) pvwsRef.current.disconnect();
+    const pvwsClient = new PvwsClient(pvwsUrl);
+    pvwsRef.current = pvwsClient;
+    pvwsClient.connect();
+
+    archiverRef.current = archiverUrl ? new ArchiverClient(archiverUrl) : null;
+
+    const cfUrl = buildChannelFinderUrl(result.config);
+    if (cfUrl) setChannelFinderUrl(cfUrl);
+
+    return result;
+  }, [config]);
+
   /** Update DataSource URLs at runtime, persist to localStorage, reconnect clients. */
   const updateDataSources = useCallback((pvwsUrl, archiverUrl) => {
     saveDataSources({ pvwsUrl, archiverUrl });
@@ -140,8 +184,8 @@ export function AppProvider({ children }) {
   }, [dataSources.pvwsDefault, dataSources.archiverDefault, updateDataSources]);
 
   /** Save a new git config and reload the page to re-bootstrap from the new URL. */
-  const updateGitConfig = useCallback((giturl, gitbranch, token) => {
-    saveGitConfig(giturl, gitbranch, token);
+  const updateGitConfig = useCallback((giturl, gitbranch, token, valuesPath) => {
+    saveGitConfig(giturl, gitbranch, token, valuesPath);
     window.location.reload();
   }, []);
 
@@ -165,10 +209,12 @@ export function AppProvider({ children }) {
     dataSources,
     updateDataSources,
     resetDataSources,
+    refreshConfig,
     // Git bootstrap config (for Settings UI)
     gitConfig: {
       giturl:    storedGit.giturl    || config?._giturl    || '',
       gitbranch: storedGit.gitbranch || config?._gitbranch || 'main',
+      valuesPath: storedGit.valuesPath || '/values.yaml',
     },
     updateGitConfig,
     resetGitConfig,

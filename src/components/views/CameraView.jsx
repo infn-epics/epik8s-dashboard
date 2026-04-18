@@ -1,5 +1,6 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import CameraWidget from '../../widgets/types/CameraWidget.jsx';
 import { deviceToWidgetConfig } from '../../models/dashboard.js';
 
@@ -8,11 +9,14 @@ import { deviceToWidgetConfig } from '../../models/dashboard.js';
  * Renders a simple CSS grid (not react-grid-layout) for the fixed NxM layout.
  */
 export default function CameraView() {
-  const { cameras, pvwsClient } = useApp();
+  const { cameras, pvwsClient, gitConfig, refreshConfig } = useApp();
+  const { token } = useAuth();
 
   const [rows, setRows] = useState(2);
   const [cols, setCols] = useState(3);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
 
   const totalTiles = rows * cols;
 
@@ -28,6 +32,21 @@ export default function CameraView() {
 
   const setTileCamera = (tileIdx, camIdx) => {
     setSelections((prev) => ({ ...prev, [tileIdx]: camIdx }));
+  };
+
+  const handleSync = async () => {
+    if (!gitConfig?.giturl || syncing) return;
+    setSyncing(true);
+    setSyncStatus('Syncing from git…');
+    try {
+      const result = await refreshConfig({ token: token || null });
+      setSelections({});
+      setSyncStatus(`Synced ${result.cameras.length} camera(s)`);
+    } catch (err) {
+      setSyncStatus(`Sync failed: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   if (cameras.length === 0) {
@@ -46,6 +65,14 @@ export default function CameraView() {
         <div className="toolbar-controls">
           <button className="toolbar-btn" onClick={() => setSettingsOpen((o) => !o)}>
             ⚙ Grid {rows}×{cols}
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={handleSync}
+            disabled={!gitConfig?.giturl || syncing}
+            title={gitConfig?.giturl ? `Sync camera configuration from ${gitConfig.gitbranch || 'main'}` : 'Configure a beamline repository in Settings first'}
+          >
+            {syncing ? '⟳ Syncing…' : '⇅ Sync Git'}
           </button>
           {settingsOpen && (
             <div className="toolbar-dropdown">
@@ -72,6 +99,7 @@ export default function CameraView() {
               <span className="cam-count">{cameras.length} camera(s)</span>
             </div>
           )}
+          {syncStatus && <span className="cam-count">{syncStatus}</span>}
         </div>
       </div>
 

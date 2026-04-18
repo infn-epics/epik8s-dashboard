@@ -21,17 +21,20 @@ const GIT_VALUES_CANDIDATES = [VALUES_YAML_PATH, `deploy/${VALUES_YAML_PATH}`];
 const LS_GITURL_KEY = 'epik8s-giturl';
 const LS_GITBRANCH_KEY = 'epik8s-gitbranch';
 const LS_GITTOKEN_KEY = 'epik8s-gittoken';
+const LS_GITVALUESPATH_KEY = 'epik8s-git-values-path';
 
-export function saveGitConfig(giturl, gitbranch, token) {
+export function saveGitConfig(giturl, gitbranch, token, valuesPath) {
   if (giturl) localStorage.setItem(LS_GITURL_KEY, giturl);
   if (gitbranch) localStorage.setItem(LS_GITBRANCH_KEY, gitbranch);
   if (token) localStorage.setItem(LS_GITTOKEN_KEY, token);
+  if (valuesPath !== undefined) localStorage.setItem(LS_GITVALUESPATH_KEY, valuesPath || '/values.yaml');
 }
 
 export function clearGitConfig() {
   localStorage.removeItem(LS_GITURL_KEY);
   localStorage.removeItem(LS_GITBRANCH_KEY);
   localStorage.removeItem(LS_GITTOKEN_KEY);
+  localStorage.removeItem(LS_GITVALUESPATH_KEY);
 }
 
 export function loadStoredGitConfig() {
@@ -39,6 +42,7 @@ export function loadStoredGitConfig() {
     giturl: localStorage.getItem(LS_GITURL_KEY) || '',
     gitbranch: localStorage.getItem(LS_GITBRANCH_KEY) || 'main',
     token: localStorage.getItem(LS_GITTOKEN_KEY) || '',
+    valuesPath: localStorage.getItem(LS_GITVALUESPATH_KEY) || '/values.yaml',
   };
 }
 
@@ -54,6 +58,7 @@ export function loadStoredGitConfig() {
  */
 export async function loadConfig(valuesPath = '/values.yaml', opts = {}) {
   let text;
+  let config;
   let resolvedGiturl = opts.giturl || '';
   let resolvedBranch = opts.gitbranch || 'main';
 
@@ -65,26 +70,37 @@ export async function loadConfig(valuesPath = '/values.yaml', opts = {}) {
 
     const requestedPath = String(valuesPath || '').replace(/^\/+/, '') || VALUES_YAML_PATH;
     const candidatePaths = [...new Set([requestedPath, ...GIT_VALUES_CANDIDATES])];
-    let lastError = null;
+    const errors = [];
 
     for (const candidate of candidatePaths) {
       try {
-        text = await fetchFileFromGit(repoInfo, candidate, resolvedBranch, opts.token || null);
-        break;
+        const candidateText = await fetchFileFromGit(repoInfo, candidate, resolvedBranch, opts.token || null);
+        try {
+          const parsed = yaml.load(candidateText);
+          text = candidateText;
+          config = parsed;
+          break;
+        } catch (parseErr) {
+          errors.push(`${candidate}: ${parseErr.message}`);
+        }
       } catch (err) {
-        lastError = err;
-        if (!String(err?.message || '').includes('404')) throw err;
+        const msg = String(err?.message || 'Unknown error');
+        errors.push(`${candidate}: ${msg}`);
+        if (!msg.includes('404')) {
+          throw err;
+        }
       }
     }
 
-    if (!text && lastError) throw lastError;
+    if (!config) {
+      throw new Error(`Failed to load a valid YAML configuration from repository ${resolvedGiturl}. ${errors.join(' | ')}`);
+    }
   } else {
     const resp = await fetch(proxyUrl(valuesPath));
     if (!resp.ok) throw new Error(`Failed to load ${valuesPath}: ${resp.status}`);
     text = await resp.text();
+    config = yaml.load(text);
   }
-
-  const config = yaml.load(text);
 
   // Expose giturl/gitbranch from the YAML if not provided as opts
   if (!resolvedGiturl && config.giturl) {

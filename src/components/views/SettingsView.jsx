@@ -25,6 +25,7 @@ export default function SettingsView() {
   // Git URL config
   const [giturl, setGiturl] = useState(gitConfig?.giturl || '');
   const [gitbranch, setGitbranch] = useState(gitConfig?.gitbranch || 'main');
+  const [gitValuesPath, setGitValuesPath] = useState(gitConfig?.valuesPath || '/values.yaml');
   const [gitSaved, setGitSaved] = useState(false);
 
   // PAT input
@@ -53,7 +54,7 @@ export default function SettingsView() {
 
   const handleGitSave = () => {
     if (!giturl.trim()) return;
-    updateGitConfig(giturl.trim(), gitbranch.trim() || 'main', null);
+    updateGitConfig(giturl.trim(), gitbranch.trim() || 'main', null, gitValuesPath.trim() || '/values.yaml');
     setGitSaved(true); // page reloads so this is just a visual flash
   };
 
@@ -71,8 +72,8 @@ export default function SettingsView() {
         <h3 className="settings-section-title">🦊 Beamline Repository</h3>
         <p className="settings-section-desc">
           Set the beamline git repository URL as the primary configuration source.
-          The dashboard will load <code>values.yaml</code> (and all <code>deploy/values-*.yaml</code>)
-          directly from git. Leave blank to fall back to the local <code>/values.yaml</code>.
+          The dashboard loads the beamline YAML from a repo-relative path. By default it tries <code>values.yaml</code>, then <code>deploy/values.yaml</code>.
+          You can override that path below. Leave blank to fall back to the local <code>/values.yaml</code>.
         </p>
         <div className="settings-field">
           <label className="settings-label" htmlFor="git-url">Repository URL</label>
@@ -100,6 +101,20 @@ export default function SettingsView() {
             placeholder="main"
             style={{ maxWidth: 180 }}
           />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="git-values-path">Beamline config path</label>
+          <input
+            id="git-values-path"
+            className="settings-input"
+            type="text"
+            value={gitValuesPath}
+            onChange={(e) => setGitValuesPath(e.target.value)}
+            placeholder="deploy/values.yaml"
+          />
+          <span className="settings-hint">
+            Repo-relative path, for example <code>deploy/values.yaml</code> or <code>values.yaml</code>.
+          </span>
         </div>
         <div className="settings-actions">
           <button
