@@ -22,6 +22,13 @@ function pvState(msg, enableLabel) {
   return false;
 }
 
+function formatStatNumber(value, digits = 0) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  return num.toFixed(digits);
+}
+
 export default function CameraWidget({ config, client }) {
   const viewMode = config.viewMode || 'essential';
   if (viewMode === 'detail') {
@@ -42,9 +49,14 @@ function CameraEssential({ config, client }) {
 
   const streamEnablePv = usePv(client, pvPrefix ? `${pvPrefix}:Stream1:EnableCallbacks` : null);
   const acquirePv = usePv(client, pvPrefix ? `${pvPrefix}:Acquire` : null);
+  const frameCounterPv = usePv(client, pvPrefix ? `${pvPrefix}:ArrayCounter_RBV` : null);
+  const streamRatePv = usePv(client, pvPrefix ? `${pvPrefix}:Stream1:ArrayRate_RBV` : null);
+  const arrayRatePv = usePv(client, pvPrefix ? `${pvPrefix}:ArrayRate_RBV` : null);
 
   const streamState = pvState(streamEnablePv, 'Enable');
   const acquireState = pvState(acquirePv, 'Acquire');
+  const frameCounter = formatStatNumber(frameCounterPv?.value, 0);
+  const frameRate = formatStatNumber(streamRatePv?.value ?? arrayRatePv?.value, 2);
 
   const showStream = streamState !== false && !!config.streamUrl;
   const streamEnabled = streamState === true;
@@ -115,6 +127,17 @@ function CameraEssential({ config, client }) {
         <button className={`widget-action-btn ${isAcquiring ? 'on' : acquireState === null ? 'unknown' : 'off'}`} onClick={toggleAcquire}>
           {isAcquiring ? '⏹ Stop' : '▶ Acquire'}
         </button>
+      </div>
+
+      <div className="camera-stats-bar">
+        <div className="camera-stat">
+          <span className="camera-stat-label">Frame #</span>
+          <span className="camera-stat-value">{frameCounter ?? '---'}</span>
+        </div>
+        <div className="camera-stat">
+          <span className="camera-stat-label">Frame/s</span>
+          <span className="camera-stat-value">{frameRate !== null ? `${frameRate} fps` : '--- fps'}</span>
+        </div>
       </div>
 
       <div className="camera-sliders">

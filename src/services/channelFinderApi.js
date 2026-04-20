@@ -13,6 +13,12 @@ import { proxyUrl } from './devProxy.js';
 
 let _baseUrl = null;
 
+export function normalizeChannelNameFilter(name) {
+  const raw = (name || '').toString().trim();
+  if (!raw) return raw;
+  return raw.replace(/^(pva|ca):\/\//i, '');
+}
+
 /**
  * Build the ChannelFinder URL from config.
  */
@@ -69,7 +75,7 @@ export async function searchChannels(filters = {}, page = 0, pageSize = 50) {
   if (!_baseUrl) throw new Error('ChannelFinder URL not configured');
 
   const params = new URLSearchParams();
-  if (filters.name) params.set('~name', filters.name);
+  if (filters.name) params.set('~name', normalizeChannelNameFilter(filters.name));
   if (filters.iocName) params.set('iocName', filters.iocName);
   if (filters.zone) params.set('zone', filters.zone);
   if (filters.devtype) params.set('devtype', filters.devtype);
@@ -80,7 +86,13 @@ export async function searchChannels(filters = {}, page = 0, pageSize = 50) {
   if (filters.raw) {
     for (const part of filters.raw.split('&')) {
       const [k, ...rest] = part.split('=');
-      if (k) params.set(k.trim(), rest.join('=').trim());
+      if (!k) continue;
+      const key = k.trim();
+      const rawValue = rest.join('=').trim();
+      const value = key === 'name' || key === '~name'
+        ? normalizeChannelNameFilter(rawValue)
+        : rawValue;
+      params.set(key, value);
     }
   }
 

@@ -2,9 +2,22 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext.jsx';
 import { searchChannels, getChannelFinderUrl } from '../../services/channelFinderApi.js';
+import { normalizeChannelNameFilter } from '../../services/channelFinderApi.js';
 import { PvDisplay } from '../common/PvControls.jsx';
 
 const PAGE_SIZE = 50;
+
+function getChannelProtocol(channel) {
+  return channel?.properties?.find((p) => p.name === 'pvProtocol')?.value || 'ca';
+}
+
+export function resolveChannelRuntimePv(channel) {
+  const rawName = normalizeChannelNameFilter(channel?.name || '');
+  const protocol = getChannelProtocol(channel);
+  if (!rawName) return '';
+  if (/^(pva|ca):\/\//i.test(channel?.name || '')) return channel.name;
+  return protocol === 'pva' ? `pva://${rawName}` : rawName;
+}
 
 /**
  * ChannelBrowserView — paginated channel browser with filters.
@@ -339,7 +352,7 @@ export default function ChannelBrowserView() {
           <button
             className="cb-context-item"
             onClick={() => {
-              setSelectedPv(contextMenu.channel.name);
+              setSelectedPv(resolveChannelRuntimePv(contextMenu.channel));
               closeContextMenu();
             }}
           >
@@ -348,7 +361,7 @@ export default function ChannelBrowserView() {
           <button
             className="cb-context-item"
             onClick={() => {
-              handleCopyPv(contextMenu.channel.name);
+              handleCopyPv(resolveChannelRuntimePv(contextMenu.channel));
               closeContextMenu();
             }}
           >

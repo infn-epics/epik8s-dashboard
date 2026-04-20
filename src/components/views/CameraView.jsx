@@ -1,8 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useGitStorage } from '../../hooks/useGitStorage.js';
 import CameraWidget from '../../widgets/types/CameraWidget.jsx';
 import { deviceToWidgetConfig } from '../../models/dashboard.js';
+import {
+  buildCameraConfigSnapshot,
+  loadCameraConfigPreset,
+  loadCurrentCameraConfig,
+  normalizeCameraConfigName,
+  resolveCameraConfigSnapshot,
+  saveCameraConfigPreset,
+  saveCurrentCameraConfig,
+  listCameraConfigPresets,
+} from '../../services/cameraConfigStorage.js';
 
 /**
  * CameraView - NxM grid of camera streams (original camera array functionality).
@@ -11,12 +22,21 @@ import { deviceToWidgetConfig } from '../../models/dashboard.js';
 export default function CameraView() {
   const { cameras, pvwsClient, gitConfig, refreshConfig } = useApp();
   const { token } = useAuth();
+  const { gitStorage, canSync, canWrite } = useGitStorage();
+  const initialCameraConfig = loadCurrentCameraConfig();
 
-  const [rows, setRows] = useState(2);
-  const [cols, setCols] = useState(3);
+  const [rows, setRows] = useState(initialCameraConfig?.rows || 2);
+  const [cols, setCols] = useState(initialCameraConfig?.cols || 3);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
+  const [configName, setConfigName] = useState(initialCameraConfig?.name || '');
+  const [savedConfigs, setSavedConfigs] = useState([]);
+  const [selectedConfig, setSelectedConfig] = useState('');
+  const [configStatus, setConfigStatus] = useState('');
+  const [configBusy, setConfigBusy] = useState(false);
+  const [configRefs, setConfigRefs] = useState({});
+  const [restorePending, setRestorePending] = useState(initialCameraConfig);
 
   const totalTiles = rows * cols;
 
@@ -32,6 +52,143 @@ export default function CameraView() {
 
   const setTileCamera = (tileIdx, camIdx) => {
     setSelections((prev) => ({ ...prev, [tileIdx]: camIdx }));
+  };
+
+  const applyCameraConfig = (snapshot) => {
+    const resolved = resolveCameraConfigSnapshot(snapshot, cameras);
+    setRows(resolved.rows);
+    setCols(resolved.cols);
+    setSelections(resolved.selections);
+    if (snapshot?.name) {
+      setConfigName(snapshot.name);
+    }
+  };
+
+  const refreshSavedConfigs = async () => {
+    const locals = listCameraConfigPresets().map((name) => ({
+      id: `local:${name}`,
+      name,
+      source: 'local',
+    }));
+
+    let remotes = [];
+    if (canSync && gitStorage) {
+      try {
+        const remoteList = await gitStorage.listCameraConfigs();
+        remotes = remoteList.map((item) => ({
+          id: `git:${item.name}`,
+          name: item.name,
+          source: 'git',
+        }));
+      } catch (err) {
+        setConfigStatus(`Git list unavailable: ${err.message}`);
+      }
+    }
+
+    setSavedConfigs([...locals, ...remotes]);
+  };
+
+  useEffect(() => {
+    if (restorePending && cameras.length) {
+      applyCameraConfig(restorePending);
+      setRestorePending(null);
+    }
+  }, [restorePending, cameras]);
+
+  useEffect(() => {
+    if (!cameras.length) return;
+    const snapshot = buildCameraConfigSnapshot({ name: configName, rows, cols, selections, cameras });
+    saveCurrentCameraConfig(snapshot);
+  }, [rows, cols, selections, cameras, configName]);
+
+  useEffect(() => {
+    if (settingsOpen) {
+      refreshSavedConfigs();
+    }
+  }, [settingsOpen, gitStorage, canSync]);
+
+  const handleSaveLocalConfig = () => {
+    try {
+      const name = normalizeCameraConfigName(configName || `camera-grid-${rows}x${cols}`);
+      if (!name) return;
+      const snapshot = buildCameraConfigSnapshot({ name, rows, cols, selections, cameras });
+      saveCameraConfigPreset(name, snapshot);
+      saveCurrentCameraConfig(snapshot);
+      setConfigName(name);
+      setSelectedConfig(`local:${name}`);
+      setConfigStatus(`Saved locally: ${name}`);
+      refreshSavedConfigs();
+    } catch (err) {
+      setConfigStatus(`Local save failed: ${err.message}`);
+    }
+  };
+
+  const handleLoadSelectedConfig = async () => {
+    if (!selectedConfig) return;
+    const [source, name] = selectedConfig.split(':');
+    try {
+      if (source === 'git') {
+        if (!gitStorage) throw new Error('Git storage is not configured');
+        const { data, ref } = await gitStorage.loadCameraConfig(name);
+        applyCameraConfig(data);
+        setConfigRefs((prev) => ({ ...prev, [name]: ref }));
+      } else {
+        const data = loadCameraConfigPreset(name);
+        if (!data) throw new Error('Local preset not found');
+        applyCameraConfig(data);
+      }
+      setConfigStatus(`Loaded ${source} config: ${name}`);
+    } catch (err) {
+      setConfigStatus(`Load failed: ${err.message}`);
+    }
+  };
+
+  const handleSaveGitConfig = async () => {
+    if (!gitStorage) {
+      setConfigStatus('Set a beamline git repository first');
+      return;
+    }
+    if (!canWrite) {
+      setConfigStatus('Login with a token to write camera configs to git');
+      return;
+    }
+
+    const name = normalizeCameraConfigName(configName || `camera-grid-${rows}x${cols}`);
+    if (!name) return;
+
+    setConfigBusy(true);
+    try {
+      const snapshot = buildCameraConfigSnapshot({ name, rows, cols, selections, cameras });
+      saveCameraConfigPreset(name, snapshot);
+      saveCurrentCameraConfig(snapshot);
+
+      const check = await gitStorage.checkCameraConfigConflict(name, configRefs[name]);
+      if (check.conflict) {
+        const overwrite = window.confirm(`Remote camera config "${name}" changed. Overwrite it with the current one?`);
+        if (!overwrite) {
+          setConfigStatus('Git save cancelled');
+          return;
+        }
+      }
+
+      const message = window.prompt('Commit message:', `Update camera config: ${name}`);
+      if (!message) {
+        setConfigStatus('Git save cancelled');
+        return;
+      }
+
+      const result = await gitStorage.saveCameraConfig(name, snapshot, message, check.remoteRef || configRefs[name]);
+      const ref = result?.content?.sha || result?.file_path || check.remoteRef || null;
+      setConfigRefs((prev) => ({ ...prev, [name]: ref }));
+      setConfigName(name);
+      setSelectedConfig(`git:${name}`);
+      setConfigStatus(`Saved to git: ${name}`);
+      await refreshSavedConfigs();
+    } catch (err) {
+      setConfigStatus(`Git save failed: ${err.message}`);
+    } finally {
+      setConfigBusy(false);
+    }
   };
 
   const handleSync = async () => {
@@ -64,7 +221,7 @@ export default function CameraView() {
         <span className="view-toolbar-title">Camera Array</span>
         <div className="toolbar-controls">
           <button className="toolbar-btn" onClick={() => setSettingsOpen((o) => !o)}>
-            ⚙ Grid {rows}×{cols}
+            ⚙ Cameras {rows}×{cols}
           </button>
           <button
             className="toolbar-btn"
@@ -75,7 +232,7 @@ export default function CameraView() {
             {syncing ? '⟳ Syncing…' : '⇅ Sync Git'}
           </button>
           {settingsOpen && (
-            <div className="toolbar-dropdown">
+            <div className="toolbar-dropdown camera-config-panel">
               <label>
                 Rows
                 <input
@@ -96,7 +253,44 @@ export default function CameraView() {
                   onChange={(e) => setCols(Math.max(1, Math.min(10, +e.target.value)))}
                 />
               </label>
+              <label className="camera-config-field">
+                <span>Saved</span>
+                <select
+                  className="camera-config-select"
+                  value={selectedConfig}
+                  onChange={(e) => setSelectedConfig(e.target.value)}
+                >
+                  <option value="">Select configuration…</option>
+                  {savedConfigs.map((cfg) => (
+                    <option key={cfg.id} value={cfg.id}>
+                      {cfg.source === 'git' ? `🌐 ${cfg.name}` : `💾 ${cfg.name}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="camera-config-field">
+                <span>Name</span>
+                <input
+                  type="text"
+                  className="camera-config-input"
+                  value={configName}
+                  placeholder="operator-view"
+                  onChange={(e) => setConfigName(e.target.value)}
+                />
+              </label>
+              <div className="camera-config-actions">
+                <button className="toolbar-btn toolbar-btn--small" onClick={handleLoadSelectedConfig} disabled={!selectedConfig || configBusy}>
+                  Load
+                </button>
+                <button className="toolbar-btn toolbar-btn--small" onClick={handleSaveLocalConfig} disabled={configBusy}>
+                  Save Local
+                </button>
+                <button className="toolbar-btn toolbar-btn--small" onClick={handleSaveGitConfig} disabled={!canSync || configBusy}>
+                  {configBusy ? 'Saving…' : 'Save Git'}
+                </button>
+              </div>
               <span className="cam-count">{cameras.length} camera(s)</span>
+              {configStatus && <span className="cam-count">{configStatus}</span>}
             </div>
           )}
           {syncStatus && <span className="cam-count">{syncStatus}</span>}
@@ -107,8 +301,9 @@ export default function CameraView() {
       <div
         className="camera-grid"
         style={{
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gridTemplateRows: `repeat(${rows}, 1fr)`,
+          gridTemplateColumns: `repeat(${cols}, minmax(280px, 1fr))`,
+          gridAutoRows: 'minmax(360px, auto)',
+          alignContent: 'start',
         }}
       >
         {Array.from({ length: totalTiles }, (_, i) => {

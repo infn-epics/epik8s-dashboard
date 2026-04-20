@@ -5,8 +5,9 @@
  * git repository (GitLab or GitHub) via platform REST APIs.
  *
  * Directory convention:
- *   <repo>/dashboard/layouts/   — beamline layout JSON files
+ *   <repo>/dashboard/layouts/    — beamline layout JSON files
  *   <repo>/dashboard/dashboards/ — dashboard JSON files
+ *   <repo>/dashboard/cameras/    — camera grid configuration JSON files
  *
  * Uses gitApi.js for all git operations (read, commit).
  * Auth token comes from the AuthContext (PAT-based).
@@ -19,6 +20,7 @@ import { proxyUrl } from './devProxy.js';
 
 const LAYOUTS_DIR = 'dashboard/layouts';
 const DASHBOARDS_DIR = 'dashboard/dashboards';
+const CAMERAS_DIR = 'dashboard/cameras';
 
 function layoutPath(name) {
   const safe = name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -28,6 +30,11 @@ function layoutPath(name) {
 function dashboardPath(name) {
   const safe = name.replace(/[^a-zA-Z0-9_-]/g, '_');
   return `${DASHBOARDS_DIR}/${safe}.json`;
+}
+
+function cameraConfigPath(name) {
+  const safe = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${CAMERAS_DIR}/${safe}.json`;
 }
 
 // ─── List files in a directory ─────────────────────────────────────────
@@ -211,6 +218,50 @@ export function createGitStorage(repoInfo, branch, token) {
     /** Get commit history for a dashboard file. */
     async dashboardHistory(name, limit) {
       return fileHistory(repoInfo, dashboardPath(name), branch, token, limit);
+    },
+
+    // ─── Camera configurations ───────────────────────────────
+
+    /** List all camera config files in dashboard/cameras/ */
+    async listCameraConfigs() {
+      const files = await listDirectory(repoInfo, CAMERAS_DIR, branch, token);
+      return files.map(f => ({
+        name: f.name.replace(/\.json$/, ''),
+        path: f.path,
+        sha: f.sha,
+      }));
+    },
+
+    /** Load a camera configuration JSON by name. Returns { data, ref }. */
+    async loadCameraConfig(name) {
+      const path = cameraConfigPath(name);
+      const result = await getFile(repoInfo, path, branch, token);
+      const data = JSON.parse(result.content);
+      return { data, ref: result.sha || result.blob_id, path };
+    },
+
+    /** Save a camera configuration to git. */
+    async saveCameraConfig(name, data, commitMsg, ref) {
+      const path = cameraConfigPath(name);
+      const content = JSON.stringify(data, null, 2);
+      const message = commitMsg || `Update camera config: ${name}`;
+      return commitFile(repoInfo, path, branch, content, message, token, ref);
+    },
+
+    /** Check if the remote camera config has changed since localRef. */
+    async checkCameraConfigConflict(name, localRef) {
+      try {
+        const { data, ref } = await this.loadCameraConfig(name);
+        if (!localRef) return { conflict: false, remoteRef: ref, remoteData: data };
+        return { conflict: ref !== localRef, remoteRef: ref, remoteData: data };
+      } catch {
+        return { conflict: false, remoteRef: null, remoteData: null };
+      }
+    },
+
+    /** Get commit history for a camera config file. */
+    async cameraConfigHistory(name, limit) {
+      return fileHistory(repoInfo, cameraConfigPath(name), branch, token, limit);
     },
   };
 }
