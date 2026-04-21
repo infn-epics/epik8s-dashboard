@@ -129,14 +129,31 @@ export function SoftIOCProvider({ children }) {
       localStorage.setItem(LS_VALUES_KEY, content);
       localStorage.setItem('epik8s-softioc-last-sync', now.toISOString());
     } catch (err) {
-      setSyncStatus({ state: 'error', lastSync: null, error: err.message });
+      const msg = String(err.message);
+      const isNotFound = msg.includes('404') || msg.toLowerCase().includes('not found');
+      if (isNotFound) {
+        // File doesn't exist in the repo — clear all placeholders and cached data silently
+        const emptyData = { defaults: {}, softiocs: [] };
+        setValuesData(emptyData);
+        setValuesYaml('');
+        setValuesLoaded(true);
+        setTaskConfigs({});
+        setDirty(false);
+        localStorage.removeItem(LS_VALUES_KEY);
+        localStorage.removeItem(LS_CONFIGS_KEY);
+        const now = new Date();
+        setSyncStatus({ state: 'ok', lastSync: now, error: null });
+        localStorage.setItem('epik8s-softioc-last-sync', now.toISOString());
+      } else {
+        setSyncStatus({ state: 'error', lastSync: null, error: err.message });
+      }
     }
   }, [canSync, fetchFromGit, syncConfigs]);
 
-  // Auto-sync on mount only when no locally-cached values exist
+  // Auto-sync on mount — always sync when canSync so that stale/placeholder
+  // data from a previous session is refreshed (and cleared if file is gone).
   useEffect(() => {
-    const hasLocal = !!localStorage.getItem(LS_VALUES_KEY);
-    if (canSync && !hasLocal) {
+    if (canSync) {
       syncFromGit();
     }
     // canSync/syncFromGit are stable (derived from config at mount)

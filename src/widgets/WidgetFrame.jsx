@@ -187,7 +187,7 @@ const WidgetFrame = forwardRef(function WidgetFrame(
         <div className="widget-body">
           {Children.map(children, (child) =>
             child && typeof child === 'object'
-              ? cloneElement(child, { config: effectiveConfig })
+              ? cloneElement(child, { config: effectiveConfig, client })
               : child
           )}
         </div>
@@ -204,7 +204,7 @@ const WidgetFrame = forwardRef(function WidgetFrame(
             <div className="widget-modal-body">
               {Children.map(children, (child) =>
                 child && typeof child === 'object'
-                  ? cloneElement(child, { config: { ...effectiveConfig, viewMode: 'detail' } })
+                  ? cloneElement(child, { config: { ...effectiveConfig, viewMode: 'detail' }, client })
                   : child
               )}
             </div>
