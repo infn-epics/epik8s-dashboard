@@ -174,6 +174,17 @@ function resolveDevices(data) {
   return [];
 }
 
+function resolveDevicesWithCatalog(layoutDevices, catalogDevices) {
+  return layoutDevices
+    .map((d) => {
+      const byId = catalogDevices.find((dev) => dev.id === d.id);
+      if (byId) return byId;
+      const byName = d.name ? catalogDevices.find((dev) => dev.name === d.name) : null;
+      return byName || d;
+    })
+    .filter((d) => d.pvPrefix || d.family);
+}
+
 function toHandlePosition(value, fallback) {
   switch (String(value || '').toLowerCase()) {
     case 'left': return Position.Left;
@@ -1790,7 +1801,7 @@ function LayoutEditor() {
       if (node.type === 'device') {
         const devs = resolveDevices(node.data);
         // Try catalogue lookup first; fall back to synthesized device entries (pvPrefix on element)
-        const resolved = devs.map(d => devices.find(dev => dev.id === d.id) || d).filter(d => d.pvPrefix || d.family);
+        const resolved = resolveDevicesWithCatalog(devs, devices);
         if (resolved.length > 0) setDetailDevices(resolved);
       } else if (node.type === 'group') {
         // Collect all device nodes that are children of this group
@@ -1799,7 +1810,8 @@ function LayoutEditor() {
         const seenIds = new Set();
         childDevNodes.forEach(n => {
           resolveDevices(n.data).forEach(d => {
-            const full = devices.find(dev => dev.id === d.id) || d;
+            const [full] = resolveDevicesWithCatalog([d], devices);
+            if (!full) return;
             if ((full.pvPrefix || full.family) && !seenIds.has(full.id)) { allDevs.push(full); seenIds.add(full.id); }
           });
         });
@@ -1812,7 +1824,7 @@ function LayoutEditor() {
     if (!editMode) {
       if (node.type === 'device') {
         const devs = resolveDevices(node.data);
-        const resolved = devs.map(d => devices.find(dev => dev.id === d.id) || d).filter(d => d.pvPrefix || d.family);
+        const resolved = resolveDevicesWithCatalog(devs, devices);
         if (resolved.length > 0) { setDetailDevices(resolved); return; }
       }
     }
