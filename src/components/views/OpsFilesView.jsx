@@ -180,10 +180,10 @@ export default function OpsFilesView() {
   const [tiffPreview, setTiffPreview] = useState(null); // { path, name }
 
   const navigate = useCallback((path) => {
-    const p = path.replace(/\/$/, '') || '/';
+    const p = path.replace(/\/$/, '') || filesRoot;
     setCurrentPath(p);
     setPathInput(p);
-  }, []);
+  }, [filesRoot]);
 
   // Load directory listing whenever currentPath changes
   useEffect(() => {

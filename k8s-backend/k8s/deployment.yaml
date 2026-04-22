@@ -45,6 +45,8 @@ spec:
                 configMapKeyRef:
                   name: epik8s-backend-config
                   key: allowed-origins
+            - name: FILES_BASE_PATH
+              value: "/nfs"
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "0"   # ArgoCD in-cluster uses self-signed certs
           livenessProbe:
