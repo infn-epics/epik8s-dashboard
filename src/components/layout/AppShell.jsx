@@ -106,10 +106,11 @@ export default function AppShell({ children, theme, onToggleTheme }) {
     {
       label: 'Ops',
       icon: '⚙',
-      paths: ['/k8s', '/tickets'],
+      paths: ['/k8s', '/tickets', '/ops/files'],
       items: [
-        { to: '/k8s',     icon: '☸', label: 'K8s' },
-        { to: '/tickets', icon: '🎫', label: 'Tickets' },
+        { to: '/k8s',       icon: '☸',  label: 'K8s' },
+        { to: '/tickets',   icon: '🎫', label: 'Tickets' },
+        { to: '/ops/files', icon: '📁', label: 'Files' },
       ],
     },
   ];

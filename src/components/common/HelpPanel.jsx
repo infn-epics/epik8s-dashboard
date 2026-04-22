@@ -37,6 +37,14 @@ const HELP = {
         heading: 'Configuration',
         body: '• Click the ⚙ button to open the settings panel\n• Adjust **Rows** and **Columns** to change the grid size\n• Each tile has a dropdown to select which camera to display\n• Camera list is loaded from devices that have `stream_enable: true` in the YAML configuration',
       },
+      {
+        heading: 'Global Capture',
+        body: 'The toolbar provides batch capture controls for all displayed cameras simultaneously:\n• **Directory** — NFS path where TIFF images will be saved (e.g. `/nfs/data/run01/`)\n• **Images** — number of frames to capture (`TIFF1:NumCapture`)\n• **File #** — starting file number (`TIFF1:FileNumber`)\n• **Start Acquire** — writes to all cameras: sets the file path, creates the directory, then triggers `TIFF1:Capture`\n\nNote: each camera IOC must be subscribed (widget visible on screen) before writes can reach it via PVWS.',
+      },
+      {
+        heading: 'Saved Configurations',
+        body: 'Use **Save Local** to persist the current grid layout to browser storage. **Save Git** pushes the layout to the configured Git repository. Use **Sync Git** to pull the latest from the repository.',
+      },
     ],
   },
   '/instrumentation': {
@@ -115,11 +123,37 @@ const HELP = {
       },
       {
         heading: 'Pods & Deployments',
-        body: '• View pod status, restarts, age\n• Delete individual pods\n• Scale deployments and statefulsets up/down\n• Restart deployments with a rolling update',
+        body: '• View pod status, restarts, age\n• Delete individual pods\n• Scale deployments and statefulsets up/down\n• Restart deployments with a rolling update\n• **Logs**: stream live pod logs in the built-in terminal panel\n• **Exec / Attach**: open an interactive shell inside a running container',
       },
       {
         heading: 'Nodes',
         body: 'View cluster node status, roles, CPU/memory usage, and resource capacity.',
+      },
+    ],
+  },
+  '/ops/files': {
+    title: 'File Browser',
+    icon: '📁',
+    sections: [
+      {
+        heading: 'Overview',
+        body: 'Browse the NFS filesystem exposed by the k8s-backend. Designed for viewing and downloading camera image directories saved by the areaDetector TIFF plugin.',
+      },
+      {
+        heading: 'Root directory',
+        body: 'The **Root** shown in the toolbar is the top-level directory you are allowed to navigate into. It defaults to `/nfs` and is persisted per-browser in local storage. Click **Edit** to change it. The backend restricts all access to the path configured via the `FILES_BASE_PATH` environment variable (default: `/nfs/data`).',
+      },
+      {
+        heading: 'Navigation',
+        body: '• Click a 📁 folder to enter it\n• Click **↑ Up** or the breadcrumb segments to go back\n• Click 🏠 to jump to the root\n• Type a path in the address bar and press **Enter** or **Go**\n• Click **↻** to refresh the current directory',
+      },
+      {
+        heading: 'Files & Downloads',
+        body: '• Click a 🖼 TIFF file to preview it in the built-in viewer (decoded in-browser via utif)\n• Click 📄 any other file to download it directly\n• Click the **⬇** button next to a file to download it\n• Click **⬇ tar.gz** next to a folder (or the toolbar button) to download the entire directory as a compressed archive',
+      },
+      {
+        heading: 'TIFF Viewer',
+        body: 'Multi-page TIFF files (e.g. from areaDetector) are decoded client-side and rendered on an HTML canvas. Use the **⬇ Download** button inside the viewer to save the raw TIFF file.',
       },
     ],
   },
@@ -211,7 +245,7 @@ const GENERAL_HELP = {
     },
     {
       heading: 'Navigation',
-      body: '• **Controls**: Dashboards, Beamline, Layout, SoftIOC — device monitoring, visualization, and soft IOC management\n• **Monitor**: Cameras, Instrumentation, Channels — live data and channel browsing\n• **Ops**: Kubernetes, Tickets — operational management\n• **Settings**: Data source configuration and authentication',
+      body: '• **Controls**: Dashboards, Beamline, Layout, SoftIOC — device monitoring, visualization, and soft IOC management\n• **Monitor**: Cameras, Instrumentation, Channels — live data and channel browsing\n• **Ops**: Kubernetes, Tickets, Files — operational management and NFS file browsing\n• **Settings**: Data source configuration and authentication',
     },
     {
       heading: 'Configuration',

@@ -15,8 +15,10 @@
  *   LOG_LEVEL          — morgan format (default: combined)
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, createReadStream } from 'node:fs';
 import { createServer } from 'node:http';
+import { join, normalize, resolve, extname, basename, dirname } from 'node:path';
+import { spawn } from 'node:child_process';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -763,6 +765,98 @@ podAttachWss.on('connection', async (ws, req) => {
   } catch (err) {
     if (ws.readyState === 1) ws.send(`Error: ${err.message}`);
     ws.close(1011, err.message);
+  }
+});
+
+// ─── File Browser ──────────────────────────────────────────────────────
+//
+// Provides REST access to files on the NFS mount for the camera file browser.
+// Restricted to FILES_BASE_PATH (default: /nfs/data) for path traversal safety.
+//
+// GET /api/v1/files/list?path=<dir>       — list directory entries
+// GET /api/v1/files/content?path=<file>   — stream a single file
+// GET /api/v1/files/archive?path=<dir>    — tar.gz of the entire directory
+
+const FILES_BASE_PATH = (process.env.FILES_BASE_PATH || '/nfs/data').replace(/\/$/, '');
+
+function safeFilePath(requestedPath) {
+  if (!requestedPath) return null;
+  const normalized = resolve(normalize(String(requestedPath)));
+  // Must be inside the allowed base path
+  if (!normalized.startsWith(FILES_BASE_PATH + '/') && normalized !== FILES_BASE_PATH) return null;
+  return normalized;
+}
+
+app.get('/api/v1/files/list', (req, res) => {
+  const safep = safeFilePath(req.query.path);
+  if (!safep) return res.status(403).json({ error: 'Path not allowed or missing ?path=' });
+  if (!existsSync(safep)) return res.status(404).json({ error: 'Path not found' });
+  try {
+    const st = statSync(safep);
+    if (!st.isDirectory()) return res.status(400).json({ error: 'Path is not a directory' });
+    const entries = readdirSync(safep).map(name => {
+      const full = join(safep, name);
+      try {
+        const s = statSync(full);
+        return { name, path: full, isDir: s.isDirectory(), size: s.size, mtime: s.mtime.toISOString() };
+      } catch {
+        return { name, path: full, isDir: false, size: 0, mtime: '' };
+      }
+    });
+    entries.sort((a, b) => {
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    res.json({ path: safep, entries });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/v1/files/content', (req, res) => {
+  const safep = safeFilePath(req.query.path);
+  if (!safep) return res.status(403).json({ error: 'Path not allowed or missing ?path=' });
+  if (!existsSync(safep)) return res.status(404).json({ error: 'File not found' });
+  try {
+    const st = statSync(safep);
+    if (st.isDirectory()) return res.status(400).json({ error: 'Path is a directory' });
+    const mimeMap = {
+      '.tiff': 'image/tiff', '.tif': 'image/tiff',
+      '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+      '.hdf5': 'application/x-hdf5', '.h5': 'application/x-hdf5',
+    };
+    const ct = mimeMap[extname(safep).toLowerCase()] || 'application/octet-stream';
+    const asDownload = req.query.download === '1';
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Length', st.size);
+    res.setHeader('Content-Disposition',
+      `${asDownload ? 'attachment' : 'inline'}; filename="${basename(safep)}"`);
+    createReadStream(safep).pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/v1/files/archive', (req, res) => {
+  const safep = safeFilePath(req.query.path);
+  if (!safep) return res.status(403).json({ error: 'Path not allowed or missing ?path=' });
+  if (!existsSync(safep)) return res.status(404).json({ error: 'Path not found' });
+  try {
+    const st = statSync(safep);
+    if (!st.isDirectory()) return res.status(400).json({ error: 'Path is not a directory' });
+    const dirName = basename(safep);
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename="${dirName}.tar.gz"`);
+    const tar = spawn('tar', ['-czf', '-', '-C', dirname(safep), dirName]);
+    tar.stdout.pipe(res);
+    tar.stderr.on('data', d => console.error('[tar]', d.toString()));
+    tar.on('error', err => {
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+      else res.destroy();
+    });
+    req.on('close', () => tar.kill());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

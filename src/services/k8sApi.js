@@ -253,3 +253,31 @@ export function attachPod(podName, { container } = {}) {
   if (container) params.set('container', container);
   return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/attach?${params}`);
 }
+
+// ─── File Browser ───────────────────────────────────────────────────────
+
+export function listFiles(dirPath, token) {
+  const params = new URLSearchParams({ path: dirPath });
+  return apiFetch(`/api/v1/files/list?${params}`, token);
+}
+
+/**
+ * Build a URL for streaming a single file from the backend.
+ * Use with fetch(..., { headers: { Authorization } }) to get ArrayBuffer for TIFF preview,
+ * or with ?download=1 appended for direct browser download.
+ */
+export function fileContentUrl(filePath, download = false) {
+  if (!_baseUrl) return null;
+  const params = new URLSearchParams({ path: filePath });
+  if (download) params.set('download', '1');
+  return `${_baseUrl}/api/v1/files/content?${params}`;
+}
+
+/**
+ * Build a URL for downloading a directory as tar.gz.
+ */
+export function fileArchiveUrl(dirPath) {
+  if (!_baseUrl) return null;
+  const params = new URLSearchParams({ path: dirPath });
+  return `${_baseUrl}/api/v1/files/archive?${params}`;
+}

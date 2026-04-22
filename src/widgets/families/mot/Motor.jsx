@@ -8,7 +8,7 @@ function resolveEnumChoices(pvMsg) {
   return Array.isArray(c) ? c.map((v) => String(v)) : [];
 }
 
-function PoiControls({ pvPrefix, client }) {
+function PoiControls({ pvPrefix, client, poi = [] }) {
   const [openMenu, setOpenMenu] = useState(false);
   const poiSelPv = usePv(client, pvPrefix ? `${pvPrefix}:POI_SEL` : null);
   const poiCurrPv = usePv(client, pvPrefix ? `${pvPrefix}:POI_CURR` : null);
@@ -17,7 +17,9 @@ function PoiControls({ pvPrefix, client }) {
   useEffect(() => {
     if (liveChoices.length) setCachedChoices(liveChoices);
   }, [liveChoices]);
-  const choices = liveChoices.length ? liveChoices : cachedChoices;
+  // Prefer PVWS enum strings; fall back to cached, then to config poi names
+  const configChoices = poi.map((p) => p.name || String(p.value));
+  const choices = liveChoices.length ? liveChoices : (cachedChoices.length ? cachedChoices : configChoices);
   const poiCurr = (poiCurrPv?.text ?? poiCurrPv?.value ?? '').toString().trim();
   const rawSel = poiSelPv?.value;
   const selIdx = (() => {
@@ -30,7 +32,7 @@ function PoiControls({ pvPrefix, client }) {
     }
     return null;
   })();
-  const hasPoiSel = choices.length > 0 || Number.isInteger(selIdx);
+  const hasPoiSel = choices.length > 0 || Number.isInteger(selIdx) || poi.length > 0;
   const hasPoiCurr = poiCurr.length > 0;
 
   if (!hasPoiSel && !hasPoiCurr) return null;
@@ -140,17 +142,18 @@ export default function MotorWidget({ config, client }) {
   const numberFormat = config.format || 'decimal';
   const showUnits = config.showUnits !== false;
   const viewMode = config.viewMode || 'essential';
+  const poi = config.poi || [];
 
   if (viewMode === 'detail') {
-    return <MotorDetail pvPrefix={pvPrefix} client={client} precision={precision} numberFormat={numberFormat} showUnits={showUnits} />;
+    return <MotorDetail pvPrefix={pvPrefix} client={client} precision={precision} numberFormat={numberFormat} showUnits={showUnits} poi={poi} />;
   }
-  return <MotorEssential pvPrefix={pvPrefix} client={client} precision={precision} numberFormat={numberFormat} showUnits={showUnits} />;
+  return <MotorEssential pvPrefix={pvPrefix} client={client} precision={precision} numberFormat={numberFormat} showUnits={showUnits} poi={poi} />;
 }
 
 /* ============================================================
    Essential view — compact motor controls
    ============================================================ */
-function MotorEssential({ pvPrefix, client, precision, numberFormat, showUnits }) {
+function MotorEssential({ pvPrefix, client, precision, numberFormat, showUnits, poi = [] }) {
   const rbvPv = usePv(client, pvPrefix ? `${pvPrefix}.RBV` : null);
   const dmovPv = usePv(client, pvPrefix ? `${pvPrefix}.DMOV` : null);
   const hlsPv = usePv(client, pvPrefix ? `${pvPrefix}.HLS` : null);
@@ -195,7 +198,7 @@ function MotorEssential({ pvPrefix, client, precision, numberFormat, showUnits }
         <button className="widget-action-btn motor-stop-btn" onClick={() => put('.STOP', 1)}>⏹ STOP</button>
       </div>
 
-      <PoiControls pvPrefix={pvPrefix} client={client} />
+      <PoiControls pvPrefix={pvPrefix} client={client} poi={poi} />
     </div>
   );
 }
@@ -203,7 +206,7 @@ function MotorEssential({ pvPrefix, client, precision, numberFormat, showUnits }
 /* ============================================================
    Detail view — full 4-tab expert panel (unchanged from before)
    ============================================================ */
-function MotorDetail({ pvPrefix, client, precision, numberFormat, showUnits }) {
+function MotorDetail({ pvPrefix, client, precision, numberFormat, showUnits, poi = [] }) {
   const [tab, setTab] = useState('drive');
 
   const dmovPv = usePv(client, pvPrefix ? `${pvPrefix}.DMOV` : null);
@@ -244,7 +247,7 @@ function MotorDetail({ pvPrefix, client, precision, numberFormat, showUnits }) {
       </div>
 
       <div className="motor-tab-content">
-        {tab === 'drive' && <DriveTab pvPrefix={pvPrefix} client={client} precision={precision} numberFormat={numberFormat} showUnits={showUnits} put={put} />}
+        {tab === 'drive' && <DriveTab pvPrefix={pvPrefix} client={client} precision={precision} numberFormat={numberFormat} showUnits={showUnits} put={put} poi={poi} />}
         {tab === 'status' && <StatusTab pvPrefix={pvPrefix} client={client} numberFormat={numberFormat} showUnits={showUnits} put={put} />}
         {tab === 'dynamics' && <DynamicsTab pvPrefix={pvPrefix} client={client} numberFormat={numberFormat} showUnits={showUnits} put={put} />}
         {tab === 'resolution' && <ResolutionTab pvPrefix={pvPrefix} client={client} numberFormat={numberFormat} showUnits={showUnits} put={put} />}
@@ -267,7 +270,7 @@ function FieldRow({ client, pvPrefix, suffix, label, precision = 4, format = 'de
 }
 
 /* === Drive Tab === */
-function DriveTab({ pvPrefix, client, precision, numberFormat, showUnits, put }) {
+function DriveTab({ pvPrefix, client, precision, numberFormat, showUnits, put, poi = [] }) {
   return (
     <div className="motor-drive-tab">
       {/* Position readback & setpoint grid */}
@@ -313,7 +316,7 @@ function DriveTab({ pvPrefix, client, precision, numberFormat, showUnits, put })
       </div>
 
       <div className="motor-section-title">POI</div>
-      <PoiControls pvPrefix={pvPrefix} client={client} />
+      <PoiControls pvPrefix={pvPrefix} client={client} poi={poi} />
     </div>
   );
 }

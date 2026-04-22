@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePv } from '../../hooks/usePv.js';
-import { PvSlider, PvDisplay, PvInput } from '../../components/common/PvControls.jsx';
+import { PvSlider, PvDisplay, PvInput, PvTextInput } from '../../components/common/PvControls.jsx';
 
 /**
  * CameraWidget — AreaDetector camera with essential/detail views.
@@ -52,6 +52,12 @@ function CameraEssential({ config, client }) {
   const frameCounterPv = usePv(client, pvPrefix ? `${pvPrefix}:ArrayCounter_RBV` : null);
   const streamRatePv = usePv(client, pvPrefix ? `${pvPrefix}:Stream1:ArrayRate_RBV` : null);
   const arrayRatePv = usePv(client, pvPrefix ? `${pvPrefix}:ArrayRate_RBV` : null);
+  // Subscribe to TIFF1 PVs so PVWS/gateway tracks them — required before global capture can write
+  usePv(client, pvPrefix ? `${pvPrefix}:TIFF1:Capture` : null);
+  usePv(client, pvPrefix ? `${pvPrefix}:TIFF1:CreateDirectory` : null);
+  usePv(client, pvPrefix ? `${pvPrefix}:TIFF1:FilePath` : null);
+  usePv(client, pvPrefix ? `${pvPrefix}:TIFF1:NumCapture` : null);
+  usePv(client, pvPrefix ? `${pvPrefix}:TIFF1:FileNumber` : null);
 
   const streamState = pvState(streamEnablePv, 'Enable');
   const acquireState = pvState(acquirePv, 'Acquire');
@@ -238,11 +244,65 @@ function CameraDetail({ config, client }) {
 
 /** Reusable row for AD PV fields */
 function ADField({ client, pvPrefix, suffix, label, editable = false, step }) {
+  const pvName = pvPrefix ? `${pvPrefix}${suffix}` : '';
+
   return (
     <div className="motor-field-row">
       <span className="motor-field-label">{label}</span>
-      <PvDisplay client={client} pvName={pvPrefix ? `${pvPrefix}${suffix}` : ''} precision={3} />
-      {editable && <PvInput client={client} pvName={pvPrefix ? `${pvPrefix}${suffix}` : ''} step={step || 1} />}
+      <PvDisplay client={client} pvName={pvName} precision={3} />
+      {editable && <PvInput client={client} pvName={pvName} step={step || 1} />}
+    </div>
+  );
+}
+
+function ADToggleField({ client, pvPrefix, suffix, label, enableLabel = 'Enable' }) {
+  const pvName = pvPrefix ? `${pvPrefix}${suffix}` : '';
+  const pv = usePv(client, pvName);
+  const enabled = pvState(pv, enableLabel) === true;
+
+  const toggle = () => {
+    if (!client || !pvName) return;
+    client.put(pvName, enabled ? 0 : 1);
+  };
+
+  return (
+    <div className="motor-field-row">
+      <span className="motor-field-label">{label}</span>
+      <PvDisplay client={client} pvName={pvName} precision={3} />
+      <button type="button" className={`widget-action-btn ${enabled ? 'on' : 'off'}`} onClick={toggle}>
+        {enabled ? 'ON' : 'OFF'}
+      </button>
+    </div>
+  );
+}
+
+function ADTextField({ client, pvPrefix, suffix, label }) {
+  const pvName = pvPrefix ? `${pvPrefix}${suffix}` : '';
+
+  return (
+    <div className="motor-field-row">
+      <span className="motor-field-label">{label}</span>
+      <PvDisplay client={client} pvName={pvName} precision={3} />
+      <PvTextInput client={client} pvName={pvName} />
+    </div>
+  );
+}
+
+function ADActionField({ client, pvPrefix, suffix, label, buttonLabel = 'Run', value = 1 }) {
+  const pvName = pvPrefix ? `${pvPrefix}${suffix}` : '';
+
+  const runAction = () => {
+    if (!client || !pvName) return;
+    client.put(pvName, value);
+  };
+
+  return (
+    <div className="motor-field-row">
+      <span className="motor-field-label">{label}</span>
+      <PvDisplay client={client} pvName={pvName} precision={3} />
+      <button type="button" className="widget-action-btn" onClick={runAction}>
+        {buttonLabel}
+      </button>
     </div>
   );
 }
@@ -311,30 +371,48 @@ function ReadoutTab({ pvPrefix, client }) {
   );
 }
 
-/* --- Plugins Tab (Stream, ROI, Stats, Proc) --- */
+/* --- Plugins Tab (Stream, ROI, Stats, Overlay) --- */
 function PluginsTab({ pvPrefix, client }) {
   return (
     <div className="camera-panel">
       <div className="motor-section-title">Stream (MJPEG)</div>
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stream1:EnableCallbacks" label="Enable" editable />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":Stream1:EnableCallbacks" label="Enable" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stream1:MinCallbackTime" label="Min Time (s)" editable step={0.01} />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stream1:DroppedArrays_RBV" label="Dropped" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stream1:ArrayRate_RBV" label="Frame Rate" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stream1:QueueSize" label="Queue Size" editable step={1} />
 
       <div className="motor-section-title">ROI1</div>
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":ROI1:EnableCallbacks" label="Enable" editable />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":ROI1:EnableCallbacks" label="Enable" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":ROI1:MinX" label="Min X" editable step={1} />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":ROI1:MinY" label="Min Y" editable step={1} />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":ROI1:SizeX" label="Size X" editable step={1} />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":ROI1:SizeY" label="Size Y" editable step={1} />
 
       <div className="motor-section-title">Stats1</div>
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:EnableCallbacks" label="Enable" editable />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":Stats1:EnableCallbacks" label="Enable" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:MeanValue_RBV" label="Mean" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:SigmaValue_RBV" label="Sigma" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:MinValue_RBV" label="Min" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:MaxValue_RBV" label="Max" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:CentroidX_RBV" label="Centroid X" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:CentroidY_RBV" label="Centroid Y" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:SigmaX_RBV" label="Sigma X" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:SigmaY_RBV" label="Sigma Y" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:SigmaXY_RBV" label="Sigma XY" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Stats1:CentroidTotal_RBV" label="Total" />
+
+      <div className="motor-section-title">Overlay1</div>
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:EnableCallbacks" label="Enable" />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:Use" label="Overlay Use" />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:Shape" label="Shape" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:PositionX" label="Position X" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:PositionY" label="Position Y" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:SizeX" label="Size X" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:SizeY" label="Size Y" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:Red" label="Red" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:Green" label="Green" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":Overlay1:1:Blue" label="Blue" editable step={1} />
     </div>
   );
 }
@@ -344,18 +422,21 @@ function FileTab({ pvPrefix, client }) {
   return (
     <div className="camera-panel">
       <div className="motor-section-title">File Output</div>
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:EnableCallbacks" label="TIFF Enable" editable />
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:FilePath" label="File Path" editable />
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:FileName" label="File Name" editable />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:EnableCallbacks" label="TIFF Enable" />
+      <ADTextField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:FilePath" label="File Path" />
+      <ADTextField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:FileName" label="File Name" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:FileNumber" label="File Number" editable step={1} />
+      <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:NumCapture" label="Num Capture" editable step={1} />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:CreateDirectory" label="Create Directory" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:AutoIncrement" label="Auto Increment" editable />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:AutoSave" label="Auto Save" editable />
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:WriteFile" label="Write File" editable />
+      <ADActionField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:Capture" label="Capture" buttonLabel="Start Capture" value={1} />
+      <ADActionField client={client} pvPrefix={pvPrefix} suffix=":TIFF1:WriteFile" label="Write File" buttonLabel="Write File" value={1} />
 
       <div className="motor-section-title">HDF5</div>
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":HDF1:EnableCallbacks" label="HDF5 Enable" editable />
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":HDF1:FilePath" label="File Path" editable />
-      <ADField client={client} pvPrefix={pvPrefix} suffix=":HDF1:FileName" label="File Name" editable />
+      <ADToggleField client={client} pvPrefix={pvPrefix} suffix=":HDF1:EnableCallbacks" label="HDF5 Enable" />
+      <ADTextField client={client} pvPrefix={pvPrefix} suffix=":HDF1:FilePath" label="File Path" />
+      <ADTextField client={client} pvPrefix={pvPrefix} suffix=":HDF1:FileName" label="File Name" />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":HDF1:NumCapture" label="Num Capture" editable step={1} />
       <ADField client={client} pvPrefix={pvPrefix} suffix=":HDF1:Capture" label="Capture" editable />
     </div>

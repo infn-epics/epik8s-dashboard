@@ -37,6 +37,11 @@ export default function CameraView() {
   const [configBusy, setConfigBusy] = useState(false);
   const [configRefs, setConfigRefs] = useState({});
   const [restorePending, setRestorePending] = useState(initialCameraConfig);
+  const [capturePath, setCapturePath] = useState('');
+  const [captureCount, setCaptureCount] = useState(1);
+  const [captureFileNumber, setCaptureFileNumber] = useState(1);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState('');
 
   const totalTiles = rows * cols;
 
@@ -206,6 +211,38 @@ export default function CameraView() {
     }
   };
 
+  const handleStartGlobalCapture = () => {
+    if (!pvwsClient || !capturePath) return;
+    setCaptureBusy(true);
+    setCaptureStatus('');
+    // Collect unique PV prefixes from all displayed cameras
+    const prefixes = [...new Set(
+      Array.from({ length: totalTiles }, (_, i) => getCamera(i))
+        .filter(Boolean)
+        .map(cam => {
+          const cfg = deviceToWidgetConfig(cam);
+          return cfg.pvPrefix || null;
+        })
+        .filter(Boolean)
+    )];
+    if (prefixes.length === 0) {
+      setCaptureStatus('No cameras configured');
+      setCaptureBusy(false);
+      return;
+    }
+    const dir = capturePath.replace(/\/$/, '') + '/';
+    const createDirectoryDepth = 1;
+    for (const pvPrefix of prefixes) {
+      pvwsClient.put(`${pvPrefix}:TIFF1:CreateDirectory`, createDirectoryDepth);
+      pvwsClient.put(`${pvPrefix}:TIFF1:FilePath`, dir);
+      pvwsClient.put(`${pvPrefix}:TIFF1:NumCapture`, Number(captureCount));
+      pvwsClient.put(`${pvPrefix}:TIFF1:FileNumber`, Number(captureFileNumber));
+      pvwsClient.put(`${pvPrefix}:TIFF1:Capture`, 1);
+    }
+    setCaptureStatus(`Started capture on ${prefixes.length} camera(s)`);
+    setCaptureBusy(false);
+  };
+
   if (cameras.length === 0) {
     return (
       <div className="view-empty">
@@ -220,6 +257,43 @@ export default function CameraView() {
       <div className="view-toolbar">
         <span className="view-toolbar-title">Camera Array</span>
         <div className="toolbar-controls">
+          <div className="camera-save-controls">
+            <label className="camera-save-field">
+              <span>Directory</span>
+              <input
+                type="text"
+                className="camera-save-input"
+                placeholder="/nfs/data/capture/"
+                value={capturePath}
+                onChange={(e) => setCapturePath(e.target.value)}
+              />
+            </label>
+            <label className="camera-save-field camera-save-field--narrow">
+              <span>Images</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="camera-save-input"
+                value={captureCount}
+                onChange={(e) => setCaptureCount(e.target.value)}
+              />
+            </label>
+            <label className="camera-save-field camera-save-field--narrow">
+              <span>File #</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="camera-save-input"
+                value={captureFileNumber}
+                onChange={(e) => setCaptureFileNumber(e.target.value)}
+              />
+            </label>
+            <button className="toolbar-btn" onClick={handleStartGlobalCapture} disabled={captureBusy}>
+              {captureBusy ? 'Starting…' : 'Start Acquire'}
+            </button>
+          </div>
           <button className="toolbar-btn" onClick={() => setSettingsOpen((o) => !o)}>
             ⚙ Cameras {rows}×{cols}
           </button>
@@ -294,6 +368,7 @@ export default function CameraView() {
             </div>
           )}
           {syncStatus && <span className="cam-count">{syncStatus}</span>}
+          {captureStatus && <span className="cam-count">{captureStatus}</span>}
         </div>
       </div>
 
