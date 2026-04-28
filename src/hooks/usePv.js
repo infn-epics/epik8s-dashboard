@@ -9,8 +9,14 @@ export function usePv(client, pvName) {
 
   useEffect(() => {
     if (!client || !pvName) return;
+    // Reset state when the PV changes so we don't merge metadata across PVs.
+    setValue(null);
     const unsub = client.subscribe(pvName, (msg) => {
-      setValue(msg);
+      // PVWS sends full metadata (labels, units, precision, vtype, ...) only
+      // with the first update. Subsequent updates only carry the changed
+      // fields (value/text/severity/seconds/nanos). Merge them so consumers
+      // always see the complete view including enum labels for mbbi/mbbo.
+      setValue((prev) => (prev ? { ...prev, ...msg } : msg));
     });
     return unsub;
   }, [client, pvName]);

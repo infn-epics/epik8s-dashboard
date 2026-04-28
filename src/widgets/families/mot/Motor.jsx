@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { usePv } from '../../../hooks/usePv.js';
-import { PvDisplay, PvInput } from '../../../components/common/PvControls.jsx';
+import { PvDisplay, PvInput, getPvText } from '../../../components/common/PvControls.jsx';
 
 function resolveEnumChoices(pvMsg) {
   if (!pvMsg) return [];
-  const c = pvMsg.choices || pvMsg.enumStrings || pvMsg.enum_strs || pvMsg.labels;
+  // PVWS sends VEnum metadata under `labels` (see Vtype2Json.handleEnum).
+  // Keep the legacy aliases for safety in case of older servers / other backends.
+  const c = pvMsg.labels || pvMsg.choices || pvMsg.enumStrings || pvMsg.enum_strs;
   return Array.isArray(c) ? c.map((v) => String(v)) : [];
 }
 
@@ -20,7 +22,7 @@ function PoiControls({ pvPrefix, client, poi = [] }) {
   // Prefer PVWS enum strings; fall back to cached, then to config poi names
   const configChoices = poi.map((p) => p.name || String(p.value));
   const choices = liveChoices.length ? liveChoices : (cachedChoices.length ? cachedChoices : configChoices);
-  const poiCurr = (poiCurrPv?.text ?? poiCurrPv?.value ?? '').toString().trim();
+  const poiCurr = getPvText(poiCurrPv).trim();
   const rawSel = poiSelPv?.value;
   const selIdx = (() => {
     if (typeof rawSel === 'number' && Number.isInteger(rawSel)) return rawSel;

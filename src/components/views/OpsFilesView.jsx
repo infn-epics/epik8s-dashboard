@@ -85,9 +85,9 @@ function TiffViewer({ filePath, fileName, token, onClose }) {
         return r.arrayBuffer();
       })
       .then(async buf => {
-        const UTIF = (await import('utif')).default;
+        const UTIF = await import('utif');
         const ifds = UTIF.decode(buf);
-        UTIF.decodeImages(buf, ifds);
+        UTIF.decodeImage(buf, ifds[0]);
         const ifd = ifds[0];
         const rgba = UTIF.toRGBA8(ifd);
         const w = ifd.width, h = ifd.height;
