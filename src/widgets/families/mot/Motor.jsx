@@ -45,7 +45,12 @@ function PoiControls({ pvPrefix, client, poi = [] }) {
 
   const goPoi = () => {
     if (!client?.put || !pvPrefix) return;
-    client.put(`${pvPrefix}:POI_GO`, 1);
+    // POI_GO is a bo record. If it was already left at "Go" by a previous click
+    // (no auto-reset configured in the template), writing 1 again still processes
+    // the record, but to be defensive against IOC variants we explicitly toggle
+    // 0 -> 1 so the FLNK to POI_PROC always fires.
+    client.put(`${pvPrefix}:POI_GO`, 0);
+    setTimeout(() => client.put(`${pvPrefix}:POI_GO`, 1), 30);
   };
 
   return (

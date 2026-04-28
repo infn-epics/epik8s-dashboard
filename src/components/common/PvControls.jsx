@@ -142,18 +142,32 @@ export function PvDisplay({
 
 /**
  * PV numeric input — writes on Enter or blur.
+ *
+ * Committing on blur (not just on form submit / Enter) is critical for
+ * controls like the motor Tweak field, where users typically type a value
+ * and then click an adjacent button (e.g. ◀ / ▶). Without an onBlur write,
+ * clicking the button moves focus away and the typed value is lost.
  */
 export function PvInput({ client, pvName, label, min, max, step }) {
   const pv = usePv(client, pvName);
   const currentVal = pv?.value ?? '';
 
+  const commit = (rawValue) => {
+    if (!client || !pvName) return;
+    const val = parseFloat(rawValue);
+    if (isNaN(val)) return;
+    // Avoid echoing back the value we just received from the PV.
+    if (currentVal !== '' && Number(currentVal) === val) return;
+    client.put(pvName, val);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    const input = e.target.elements.pvInput;
-    const val = parseFloat(input.value);
-    if (!isNaN(val) && client && pvName) {
-      client.put(pvName, val);
-    }
+    commit(e.target.elements.pvInput.value);
+  };
+
+  const handleBlur = (e) => {
+    commit(e.target.value);
   };
 
   return (
@@ -168,25 +182,32 @@ export function PvInput({ client, pvName, label, min, max, step }) {
         min={min}
         max={max}
         step={step}
+        onBlur={handleBlur}
       />
     </form>
   );
 }
 
 /**
- * PV text input for string PVs — writes on Enter.
+ * PV text input for string PVs — writes on Enter or blur.
  */
 export function PvTextInput({ client, pvName, label, placeholder = '' }) {
   const pv = usePv(client, pvName);
   const currentVal = getPvText(pv);
 
+  const commit = (val) => {
+    if (!client || !pvName) return;
+    if (val === currentVal) return;
+    client.put(pvName, val);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    const input = e.target.elements.pvTextInput;
-    const val = input.value;
-    if (client && pvName) {
-      client.put(pvName, val);
-    }
+    commit(e.target.elements.pvTextInput.value);
+  };
+
+  const handleBlur = (e) => {
+    commit(e.target.value);
   };
 
   return (
@@ -199,6 +220,7 @@ export function PvTextInput({ client, pvName, label, placeholder = '' }) {
         defaultValue={currentVal}
         key={currentVal}
         placeholder={placeholder}
+        onBlur={handleBlur}
       />
     </form>
   );

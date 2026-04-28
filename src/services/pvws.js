@@ -19,6 +19,8 @@ export default class PvwsClient {
     this._connected = false;
     this._shouldReconnect = true;
     this._pendingSubscriptions = new Set();
+    this._writeOnlyPvs = new Set();   // pvs auto-subscribed by put() (no callbacks)
+    this._knownPvs = new Set();       // pvs PVWS has acknowledged (received >=1 update)
     this._reconnectTimer = null;
   }
 
@@ -75,12 +77,17 @@ export default class PvwsClient {
       for (const pv of this._listeners.keys()) {
         this._sendSubscribe(pv);
       }
+      // and re-subscribe PVs we only ever write to (so PVWS allows writes)
+      for (const pv of this._writeOnlyPvs) {
+        this._sendSubscribe(pv);
+      }
     };
 
     this._ws.onclose = (e) => {
       console.log(`[PVWS] Disconnected (code=${e.code})`);
       this._connected = false;
       this._ws = null;
+      this._knownPvs.clear();
       this._emitStatus();
       this._scheduleReconnect();
     };
@@ -101,6 +108,7 @@ export default class PvwsClient {
         return;
       }
       if (msg.type === 'update' && msg.pv) {
+        this._knownPvs.add(msg.pv);
         const cbs = this._listeners.get(msg.pv);
         if (cbs) {
           for (const cb of cbs) cb(msg);
@@ -143,9 +151,52 @@ export default class PvwsClient {
 
   /* ---- write ---- */
 
+  /**
+   * Write a value to a PV.
+   *
+   * PVWS rejects writes to PVs it isn't currently monitoring ("Cannot write
+   * unknown PV"). For pure write-only triggers (e.g. motor record `.TWR`,
+   * `.TWF`, `.STOP`, `.HOMF`, custom `:POI_GO`) the dashboard never calls
+   * subscribe(), so we transparently subscribe here before sending the write.
+   *
+   * Sending subscribe + write back-to-back races the CA channel connection on
+   * the server side, so for newly-subscribed PVs we wait for the first update
+   * (= channel is open) before issuing the write. We retry briefly to cover
+   * slow CA connections, then give up.
+   */
   put(pv, value) {
     console.log(`[PVWS] Sending write: ${pv} = ${JSON.stringify(value)}`);
-    this._send({ type: 'write', pv, value });
+
+    const isKnown = this._knownPvs.has(pv);
+    const alreadySubscribed = this._listeners.has(pv) || this._writeOnlyPvs.has(pv);
+
+    if (!alreadySubscribed) {
+      this._writeOnlyPvs.add(pv);
+      if (this._connected) {
+        this._sendSubscribe(pv);
+      } else {
+        this._pendingSubscriptions.add(pv);
+      }
+    }
+
+    if (isKnown) {
+      this._send({ type: 'write', pv, value });
+      return;
+    }
+
+    // Wait for the channel to be acknowledged by PVWS before writing.
+    // Poll up to ~3s; matches PVWS' typical CA connection time.
+    const deadline = Date.now() + 3000;
+    const trySend = () => {
+      if (this._knownPvs.has(pv)) {
+        this._send({ type: 'write', pv, value });
+      } else if (Date.now() < deadline && this._connected) {
+        setTimeout(trySend, 100);
+      } else {
+        console.warn(`[PVWS] Write to ${pv} dropped: channel never connected`);
+      }
+    };
+    setTimeout(trySend, 100);
   }
 
   /* ---- internal send helpers ---- */
@@ -159,8 +210,22 @@ export default class PvwsClient {
   }
 
   _send(msg) {
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      // Socket not ready: queue subscribe requests so they're re-sent on reconnect.
+      if (msg.type === 'subscribe' && Array.isArray(msg.pvs)) {
+        for (const pv of msg.pvs) this._pendingSubscriptions.add(pv);
+      }
+      return;
+    }
+    try {
       this._ws.send(JSON.stringify(msg));
+    } catch (err) {
+      // Socket may have transitioned OPEN → CLOSING between the readyState
+      // check and send(). Re-queue subscriptions so the next reconnect restores them.
+      console.warn('[PVWS] send failed:', err);
+      if (msg.type === 'subscribe' && Array.isArray(msg.pvs)) {
+        for (const pv of msg.pvs) this._pendingSubscriptions.add(pv);
+      }
     }
   }
 }

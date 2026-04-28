@@ -110,8 +110,9 @@ export default function SoftIOCWizard({ onClose, onCreated, editingTask }) {
   const [description, setDescription] = useState(editingTask?.description || '');
   const [mode, setMode] = useState(editingTask?.mode || 'continuous');
   const [iocprefix, setIocprefix] = useState(editingTask?.iocprefix || '');
-  const [interval, setInterval] = useState(editingTask?.parameters?.interval ?? 1.0);
-  const [timeout, setTimeout_] = useState(editingTask?.parameters?.timeout ?? 2.0);
+  // Note: named with `Value` suffix to avoid shadowing window.setInterval / window.setTimeout.
+  const [intervalValue, setIntervalValue] = useState(editingTask?.parameters?.interval ?? 1.0);
+  const [timeoutValue, setTimeoutValue] = useState(editingTask?.parameters?.timeout ?? 2.0);
   const [usePva, setUsePva] = useState(editingTask?.parameters?.pva ?? false);
 
   // Inputs
@@ -260,14 +261,14 @@ export default function SoftIOCWizard({ onClose, onCreated, editingTask }) {
       iocprefix,
       template: templateId,
       requiresPython: template?.requiresPython ?? false,
-      parameters: { mode, interval: parseFloat(interval), timeout: parseFloat(timeout), pva: usePva },
+      parameters: { mode, interval: parseFloat(intervalValue), timeout: parseFloat(timeoutValue), pva: usePva },
       inputs: inputsObj,
       outputs: outputsObj,
       rules,
       rule_defaults: ruleDefaults,
       transforms,
     };
-  }, [moduleName, description, mode, iocprefix, templateId, template, interval, timeout, usePva, inputs, outputs, rules, ruleDefaults, transforms]);
+  }, [moduleName, description, mode, iocprefix, templateId, template, intervalValue, timeoutValue, usePva, inputs, outputs, rules, ruleDefaults, transforms]);
 
   // Save/create
   const handleSave = useCallback(() => {
@@ -336,13 +337,13 @@ export default function SoftIOCWizard({ onClose, onCreated, editingTask }) {
         </label>
         <label>
           Interval (s)
-          <input type="number" value={interval} step="0.1" min="0.1"
-            onChange={(e) => setInterval(e.target.value)} />
+          <input type="number" value={intervalValue} step="0.1" min="0.1"
+            onChange={(e) => setIntervalValue(e.target.value)} />
         </label>
         <label>
           Timeout (s)
-          <input type="number" value={timeout} step="0.1" min="0.5"
-            onChange={(e) => setTimeout_(e.target.value)} />
+          <input type="number" value={timeoutValue} step="0.1" min="0.5"
+            onChange={(e) => setTimeoutValue(e.target.value)} />
         </label>
         <label className="sioc-checkbox">
           <input type="checkbox" checked={usePva} onChange={(e) => setUsePva(e.target.checked)} />

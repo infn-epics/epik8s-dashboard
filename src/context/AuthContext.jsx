@@ -49,13 +49,18 @@ export function AuthProvider({ children, giturl }) {
   // Refresh role when repoInfo changes and we have a token
   useEffect(() => {
     if (token && provider && repoInfo) {
-      fetchRepoRole(provider, token, repoInfo).then(r => {
-        setRole(r);
-        const session = loadSession();
-        if (session) {
-          saveSession({ ...session, role: r });
-        }
-      });
+      fetchRepoRole(provider, token, repoInfo)
+        .then(r => {
+          setRole(r);
+          const session = loadSession();
+          if (session) {
+            saveSession({ ...session, role: r });
+          }
+        })
+        .catch(err => {
+          console.warn('[Auth] Failed to refresh repo role:', err);
+          setRole('viewer');
+        });
     }
   }, [token, provider, repoInfo]);
 

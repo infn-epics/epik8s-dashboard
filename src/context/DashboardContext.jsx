@@ -119,7 +119,8 @@ export function DashboardProvider({ children }) {
     };
     saveDashboard(updated);
     setActiveDashboard(updated);
-  }, [activeDashboard]);
+    refreshList();
+  }, [activeDashboard, refreshList]);
 
   const updateWidgetConfig = useCallback((widgetId, configChanges) => {
     if (!activeDashboard) return;
@@ -133,7 +134,8 @@ export function DashboardProvider({ children }) {
     };
     saveDashboard(updated);
     setActiveDashboard(updated);
-  }, [activeDashboard]);
+    refreshList();
+  }, [activeDashboard, refreshList]);
 
   const removeWidget = useCallback((widgetId) => {
     if (!activeDashboard) return;
@@ -161,7 +163,8 @@ export function DashboardProvider({ children }) {
     };
     saveDashboard(updated);
     setActiveDashboard(updated);
-  }, [activeDashboard]);
+    refreshList();
+  }, [activeDashboard, refreshList]);
 
   const value = {
     dashboards,
