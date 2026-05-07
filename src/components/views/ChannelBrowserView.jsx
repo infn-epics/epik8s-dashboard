@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext.jsx';
 import { searchChannels, getChannelFinderUrl } from '../../services/channelFinderApi.js';
 import { normalizeChannelNameFilter } from '../../services/channelFinderApi.js';
-import { PvDisplay } from '../common/PvControls.jsx';
+import { formatPvValue } from '../common/PvControls.jsx';
+import { usePv } from '../../hooks/usePv';
 
 const PAGE_SIZE = 50;
 
@@ -58,6 +59,8 @@ export default function ChannelBrowserView() {
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedPv, setSelectedPv] = useState('');
   const [actionStatus, setActionStatus] = useState('');
+  const [displayFormat, setDisplayFormat] = useState('decimal');
+  const [displayPrecision, setDisplayPrecision] = useState(6);
 
   const cfUrl = getChannelFinderUrl();
   const archiverUrl = archiverClient?.baseUrl || dataSources?.archiverUrl || '';
@@ -190,7 +193,7 @@ export default function ChannelBrowserView() {
       setActionStatus('Archiver URL is not configured');
       return;
     }
-    const url = `${archiverUrl}/mgmt/bpl/addPV?pv=${encodeURIComponent(pvName)}`;
+    const url = `${archiverUrl}/mgmt/bpl/archivePV?pv=${encodeURIComponent(pvName)}`;
     try {
       const resp = await fetch(url);
       const text = await resp.text();
@@ -297,16 +300,15 @@ export default function ChannelBrowserView() {
       {error && <div className="cb-error">{error}</div>}
 
       {selectedPv && (
-        <div className="cb-quick-view">
-          <div className="cb-quick-view-head">
-            <strong>Selected PV</strong>
-            <button className="toolbar-btn" onClick={() => setSelectedPv('')}>✕</button>
-          </div>
-          <div className="cb-quick-view-body">
-            <span className="cb-quick-view-name">{selectedPv}</span>
-            <PvDisplay client={pvwsClient} pvName={selectedPv} label="Live value" precision={0} />
-          </div>
-        </div>
+        <QuickViewPanel
+          pvName={selectedPv}
+          client={pvwsClient}
+          format={displayFormat}
+          precision={displayPrecision}
+          onFormatChange={setDisplayFormat}
+          onPrecisionChange={setDisplayPrecision}
+          onClose={() => setSelectedPv('')}
+        />
       )}
 
       {actionStatus && <div className="cb-action-status">{actionStatus}</div>}
@@ -424,6 +426,69 @@ export default function ChannelBrowserView() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Quick-view panel shown when a PV is selected — live value with EGU,
+ * format selector (decimal / engineering / exponential) and precision input.
+ */
+function QuickViewPanel({ pvName, client, format, precision, onFormatChange, onPrecisionChange, onClose }) {
+  const pv = usePv(client, pvName);
+  const val = pv?.value ?? pv?.text;
+  const egu = pv?.units || '';
+  const pvPrec = pv?.precision;
+
+  // On first metadata, seed precision from PV's own PREC if user hasn't changed it
+  useEffect(() => {
+    if (pvPrec != null && typeof pvPrec === 'number') {
+      onPrecisionChange(Math.min(Math.max(pvPrec, 1), 9));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvPrec]);
+
+  const display = val != null ? formatPvValue(val, format, precision) : '---';
+  const severity = pv?.severity || 'NONE';
+  const sevClass = severity !== 'NONE' ? `pv-severity--${severity.toLowerCase()}` : '';
+
+  return (
+    <div className="cb-quick-view">
+      <div className="cb-quick-view-head">
+        <strong>Live PV</strong>
+        <div className="cb-quick-view-controls">
+          <label className="cb-qv-label">Format</label>
+          <select
+            className="cb-qv-select"
+            value={format}
+            onChange={e => onFormatChange(e.target.value)}
+          >
+            <option value="decimal">Decimal</option>
+            <option value="engineering">Engineering</option>
+            <option value="exponential">Exponential</option>
+          </select>
+          <label className="cb-qv-label">Precision</label>
+          <input
+            className="cb-qv-prec"
+            type="number"
+            min={0}
+            max={9}
+            value={precision}
+            onChange={e => onPrecisionChange(Math.min(9, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+          />
+        </div>
+        <button className="toolbar-btn" onClick={onClose}>✕</button>
+      </div>
+      <div className="cb-quick-view-body">
+        <span className="cb-quick-view-name">{pvName}</span>
+        <span className={`pv-display ${sevClass}`}>
+          <span className="pv-value">{display}</span>
+          {egu && <span className="pv-unit">{egu}</span>}
+        </span>
+        {severity !== 'NONE' && (
+          <span className="cb-qv-severity">{severity}</span>
+        )}
+      </div>
     </div>
   );
 }

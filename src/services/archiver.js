@@ -16,6 +16,20 @@ export default class ArchiverClient {
     this._cache = new Map();
   }
 
+  _mgmtUrl(action, params = null) {
+    const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return `${this.baseUrl}/mgmt/bpl/${action}${qs}`;
+  }
+
+  async _mgmtJson(action, params = null, options = null) {
+    const resp = await fetch(this._mgmtUrl(action, params), options || undefined);
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(text || `HTTP ${resp.status}`);
+    }
+    return resp.json();
+  }
+
   /**
    * Fetch archived data for a PV over a time range.
    * @param {string} pv - PV name
@@ -60,10 +74,11 @@ export default class ArchiverClient {
    * @returns {Promise<string[]>}
    */
   async searchPVs(pattern) {
-    const url = `${this.baseUrl}/mgmt/bpl/getMatchingPVs?pv=${encodeURIComponent(pattern)}&limit=100`;
-    const resp = await fetch(url);
-    if (!resp.ok) return [];
-    return resp.json();
+    try {
+      return await this._mgmtJson('getMatchingPVsForThisAppliance', { pv: pattern, limit: '100' });
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -72,11 +87,54 @@ export default class ArchiverClient {
    * @returns {Promise<boolean>}
    */
   async isPVArchived(pv) {
-    const url = `${this.baseUrl}/mgmt/bpl/getPVStatus?pv=${encodeURIComponent(pv)}`;
-    const resp = await fetch(url);
-    if (!resp.ok) return false;
-    const data = await resp.json();
+    let data;
+    try {
+      data = await this._mgmtJson('getPVStatus', { pv });
+    } catch {
+      return false;
+    }
     return data.length > 0 && data[0].status === 'Being archived';
+  }
+
+  async getApplianceInfo() {
+    return this._mgmtJson('getApplianceInfo');
+  }
+
+  async getApplianceMetrics() {
+    const data = await this._mgmtJson('getApplianceMetrics');
+    return Array.isArray(data) ? (data[0] || {}) : data;
+  }
+
+  async getCurrentlyDisconnectedPVs() {
+    const data = await this._mgmtJson('getCurrentlyDisconnectedPVs');
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getPausedPVsForThisAppliance() {
+    const data = await this._mgmtJson('getPausedPVsForThisAppliance');
+    return Array.isArray(data) ? data : [];
+  }
+
+  async getPVStatus(pv) {
+    if (!pv) return [];
+    const data = await this._mgmtJson('getPVStatus', { pv });
+    return Array.isArray(data) ? data : [];
+  }
+
+  async archivePV(pv) {
+    return this._mgmtJson('archivePV', { pv });
+  }
+
+  async pauseArchivingPV(pv) {
+    return this._mgmtJson('pauseArchivingPV', { pv });
+  }
+
+  async resumeArchivingPV(pv) {
+    return this._mgmtJson('resumeArchivingPV', { pv });
+  }
+
+  async disableArchivingPV(pv) {
+    return this._mgmtJson('abortArchivingPV', { pv });
   }
 
   /** Clear the data cache. */

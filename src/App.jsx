@@ -16,6 +16,7 @@ import K8sView from './components/views/K8sView.jsx';
 import ChannelBrowserView from './components/views/ChannelBrowserView.jsx';
 import SoftIOCView from './components/views/SoftIOCView.jsx';
 import OpsFilesView from './components/views/OpsFilesView.jsx';
+import OpsArchiverView from './components/views/OpsArchiverView.jsx';
 import { SoftIOCProvider } from './context/SoftIOCContext.jsx';
 
 /** Top-level error boundary: catches crashes and shows a readable message. */
@@ -109,6 +110,7 @@ function AppRoutes() {
               <Route path="/channels" element={<ChannelBrowserView />} />
               <Route path="/softioc" element={<SoftIOCView />} />
               <Route path="/ops/files" element={<OpsFilesView />} />
+              <Route path="/ops/archiver" element={<OpsArchiverView />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </AppShell>
