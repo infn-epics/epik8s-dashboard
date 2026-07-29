@@ -1,10 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useDraggable } from '../../hooks/useDraggable.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { useVoice } from '../../context/VoiceContext.jsx';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant.js';
 import { useVoicePhase } from '../../hooks/useVoicePhase.js';
-import { VoiceOrb, TranscriptPanel, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
+import { useVoiceContent } from '../../hooks/useVoiceContent.js';
+import { buildChatFeed } from '../../voice/events.js';
+import { VoiceOrb, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
+import { ChatFeed } from './voiceContentUI.jsx';
 
 /**
  * VoiceConsole — floating/dockable panel for the experimental voice
@@ -29,6 +32,8 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
     respondConfirm,
   } = useVoiceAssistant();
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
+  const { contentBlocks } = useVoiceContent();
+  const feedEntries = useMemo(() => buildChatFeed(transcriptHistory, contentBlocks), [transcriptHistory, contentBlocks]);
   const { panelRef, onHeaderMouseDown } = useDraggable(detached);
 
   // Safety net: releasing the mouse outside the FAB must still stop the mic.
@@ -72,7 +77,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
       )}
 
       <div className="console-body voice-console-body">
-        <TranscriptPanel history={transcriptHistory} partial={partialTranscript} />
+        <ChatFeed entries={feedEntries} partial={partialTranscript} />
       </div>
 
       {voiceConfig?.debug && (

@@ -148,6 +148,22 @@ export function DebugPhasePanel({ recentTurns, liveDurationMs, visualPhase }) {
   );
 }
 
+/**
+ * One transcript row - extracted out of TranscriptPanel so ChatFeed
+ * (voiceContentUI.jsx) can interleave transcript lines with rich content
+ * blocks without duplicating this markup. TranscriptPanel's own output is
+ * unchanged (still built from this same function), so its existing tests
+ * don't need updating.
+ */
+export function TranscriptLine({ role, text, partial }) {
+  return (
+    <div className={`voice-transcript-line voice-transcript-line--${role} ${partial ? 'voice-transcript-line--partial' : ''}`}>
+      <span className="voice-transcript-role">{role === 'user' ? 'Tu' : 'Assistente'}</span>
+      <span className="voice-transcript-text">{text}</span>
+    </div>
+  );
+}
+
 /** Scrollable, collapsible live transcript panel. */
 export function TranscriptPanel({ history, partial }) {
   return (
@@ -156,16 +172,10 @@ export function TranscriptPanel({ history, partial }) {
         <div className="console-empty">Nessuna trascrizione</div>
       )}
       {history.map((entry, i) => (
-        <div key={i} className={`voice-transcript-line voice-transcript-line--${entry.role}`}>
-          <span className="voice-transcript-role">{entry.role === 'user' ? 'Tu' : 'Assistente'}</span>
-          <span className="voice-transcript-text">{entry.text}</span>
-        </div>
+        <TranscriptLine key={i} role={entry.role} text={entry.text} />
       ))}
       {partial && (
-        <div className={`voice-transcript-line voice-transcript-line--${partial.role} voice-transcript-line--partial`}>
-          <span className="voice-transcript-role">{partial.role === 'user' ? 'Tu' : 'Assistente'}</span>
-          <span className="voice-transcript-text">{partial.text}</span>
-        </div>
+        <TranscriptLine role={partial.role} text={partial.text} partial />
       )}
     </div>
   );

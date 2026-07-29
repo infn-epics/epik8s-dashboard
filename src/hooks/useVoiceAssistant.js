@@ -22,7 +22,7 @@ export function useVoiceAssistant() {
   const { client, connectionStatus } = useVoice();
   const [state, setState] = useState('idle');
   const [partialTranscript, setPartialTranscript] = useState(null); // { role, text }
-  const [transcriptHistory, setTranscriptHistory] = useState([]); // [{ role, text }]
+  const [transcriptHistory, setTranscriptHistory] = useState([]); // [{ role, text, ts }]
   const [pendingConfirm, setPendingConfirm] = useState(null); // confirm_request payload
 
   useEffect(() => {
@@ -38,7 +38,11 @@ export function useVoiceAssistant() {
           setPartialTranscript({ role: msg.role, text: msg.text });
         } else {
           setPartialTranscript(null);
-          setTranscriptHistory((prev) => [...prev, { role: msg.role, text: msg.text }]);
+          // ts (already sent by the backend on every transcript event, see
+          // events.py's send_transcript) is threaded through so buildChatFeed
+          // (src/voice/events.js) can interleave content blocks chronologically
+          // - it was previously silently dropped here, unused until now.
+          setTranscriptHistory((prev) => [...prev, { role: msg.role, text: msg.text, ts: msg.ts }]);
         }
         if (msg.role === 'assistant') setState(msg.final ? 'idle' : 'speaking');
         return;

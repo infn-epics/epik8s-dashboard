@@ -13,7 +13,10 @@ export const EVENT_TYPES = {
   CONFIRM_REQUEST: 'confirm_request',
   CONFIRM_ACTION: 'confirm_action',
   PHASE: 'phase',
+  CONTENT: 'content',
 };
+
+const CONTENT_KINDS = ['table', 'chart', 'widget'];
 
 const PHASES = ['stt', 'llm', 'tts'];
 const EDGES = ['start', 'end'];
@@ -51,6 +54,22 @@ export function isPhaseEvent(msg) {
     && typeof msg.turn_id === 'string' && !!msg.turn_id
     && PHASES.includes(msg.phase)
     && EDGES.includes(msg.edge);
+}
+
+export function isContentEvent(msg) {
+  return !!msg && msg.type === EVENT_TYPES.CONTENT && CONTENT_KINDS.includes(msg.kind);
+}
+
+export function isContentChartEvent(msg) {
+  return isContentEvent(msg) && msg.kind === 'chart' && Array.isArray(msg.series);
+}
+
+export function isContentTableEvent(msg) {
+  return isContentEvent(msg) && msg.kind === 'table' && Array.isArray(msg.columns) && Array.isArray(msg.rows);
+}
+
+export function isContentWidgetEvent(msg) {
+  return isContentEvent(msg) && msg.kind === 'widget' && typeof msg.widget_type === 'string' && !!msg.widget_type;
 }
 
 function normalize(id) {
@@ -184,6 +203,26 @@ export function computeTurnDurations(turn) {
     : null;
 
   return durations;
+}
+
+/**
+ * Merges transcript entries ({role, text, ts}) and rich content blocks
+ * ({kind, ts, ...}) into one chronologically-ordered chat feed, each entry
+ * tagged with a discriminant `kind`: 'transcript' or 'content'. Pure/
+ * dependency-free, matching this module's other reducers - ties broken by
+ * stable input order (transcript before content at equal ts) so rendering
+ * doesn't jitter between re-renders.
+ */
+export function buildChatFeed(transcriptHistory, contentBlocks) {
+  const transcriptEntries = transcriptHistory.map((entry, i) => ({
+    kind: 'transcript', ts: entry.ts ?? 0, role: entry.role, text: entry.text, _order: i,
+  }));
+  const contentEntries = contentBlocks.map((content, i) => ({
+    kind: 'content', ts: content.ts ?? 0, content, _order: transcriptEntries.length + i,
+  }));
+  return [...transcriptEntries, ...contentEntries]
+    .sort((a, b) => (a.ts - b.ts) || (a._order - b._order))
+    .map(({ _order, ...rest }) => rest);
 }
 
 // Capped linear-ish backoff for the LiveKit room connection: WebRTC/SFU

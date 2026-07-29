@@ -1,8 +1,12 @@
+import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useVoice } from '../../context/VoiceContext.jsx';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant.js';
 import { useVoicePhase } from '../../hooks/useVoicePhase.js';
-import { VoiceOrb, TranscriptPanel, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
+import { useVoiceContent } from '../../hooks/useVoiceContent.js';
+import { buildChatFeed } from '../../voice/events.js';
+import { VoiceOrb, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
+import { ChatFeed } from '../consoles/voiceContentUI.jsx';
 
 /**
  * ArgusView — full-page voice interaction with ARGUS, the accelerator
@@ -25,6 +29,8 @@ export default function ArgusView() {
     respondConfirm,
   } = useVoiceAssistant();
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
+  const { contentBlocks } = useVoiceContent();
+  const feedEntries = useMemo(() => buildChatFeed(transcriptHistory, contentBlocks), [transcriptHistory, contentBlocks]);
 
   const connected = connectionStatus === 'connected';
 
@@ -67,7 +73,7 @@ export default function ArgusView() {
 
       <div className="argus-body">
         <div className="argus-transcript-panel">
-          <TranscriptPanel history={transcriptHistory} partial={partialTranscript} />
+          <ChatFeed entries={feedEntries} partial={partialTranscript} />
           {voiceConfig?.debug && (
             <DebugPhasePanel recentTurns={recentTurns} liveDurationMs={liveDurationMs} visualPhase={visualPhase} />
           )}

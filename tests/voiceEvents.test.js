@@ -4,6 +4,11 @@ import {
   isTranscriptEvent,
   isConfirmRequestEvent,
   isPhaseEvent,
+  isContentEvent,
+  isContentChartEvent,
+  isContentTableEvent,
+  isContentWidgetEvent,
+  buildChatFeed,
   matchDeviceId,
   computeBackoffDelay,
   MAX_RECONNECT_ATTEMPTS,
@@ -43,6 +48,56 @@ describe('type guards', () => {
     expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'unknown', edge: 'start' })).toBe(false);
     expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'stt', edge: 'unknown' })).toBe(false);
     expect(isPhaseEvent({ type: 'transcript', turn_id: 't1', phase: 'stt', edge: 'start' })).toBe(false);
+  });
+
+  it('accepts well-formed content events per kind', () => {
+    expect(isContentEvent({ type: 'content', kind: 'table' })).toBe(true);
+    expect(isContentEvent({ type: 'content', kind: 'chart' })).toBe(true);
+    expect(isContentEvent({ type: 'content', kind: 'widget' })).toBe(true);
+    expect(isContentEvent({ type: 'content', kind: 'bogus' })).toBe(false);
+    expect(isContentEvent(null)).toBe(false);
+  });
+
+  it('narrows content events by kind-specific shape', () => {
+    expect(isContentChartEvent({ type: 'content', kind: 'chart', series: [] })).toBe(true);
+    expect(isContentChartEvent({ type: 'content', kind: 'chart' })).toBe(false);
+    expect(isContentChartEvent({ type: 'content', kind: 'table', series: [] })).toBe(false);
+
+    expect(isContentTableEvent({ type: 'content', kind: 'table', columns: [], rows: [] })).toBe(true);
+    expect(isContentTableEvent({ type: 'content', kind: 'table', columns: [] })).toBe(false);
+
+    expect(isContentWidgetEvent({ type: 'content', kind: 'widget', widget_type: 'motor' })).toBe(true);
+    expect(isContentWidgetEvent({ type: 'content', kind: 'widget', widget_type: '' })).toBe(false);
+  });
+});
+
+describe('buildChatFeed', () => {
+  it('interleaves transcript and content entries in chronological order', () => {
+    const transcript = [
+      { role: 'user', text: 'ciao', ts: 100 },
+      { role: 'assistant', text: 'risposta', ts: 300 },
+    ];
+    const content = [{ kind: 'chart', ts: 200, title: 'x' }];
+    const feed = buildChatFeed(transcript, content);
+    expect(feed.map((e) => e.kind)).toEqual(['transcript', 'content', 'transcript']);
+    expect(feed[1].content.title).toBe('x');
+  });
+
+  it('breaks ties at equal ts by putting transcript before content, stable order otherwise', () => {
+    const transcript = [{ role: 'user', text: 'a', ts: 100 }];
+    const content = [{ kind: 'chart', ts: 100, title: 'x' }];
+    const feed = buildChatFeed(transcript, content);
+    expect(feed.map((e) => e.kind)).toEqual(['transcript', 'content']);
+  });
+
+  it('treats a missing ts as 0, not a crash', () => {
+    const feed = buildChatFeed([{ role: 'user', text: 'a' }], []);
+    expect(feed).toHaveLength(1);
+    expect(feed[0].ts).toBe(0);
+  });
+
+  it('handles empty inputs', () => {
+    expect(buildChatFeed([], [])).toEqual([]);
   });
 });
 
