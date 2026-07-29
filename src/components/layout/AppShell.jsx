@@ -7,6 +7,7 @@ import HelpPanel from '../common/HelpPanel.jsx';
 import Sidebar from './Sidebar.jsx';
 import ChatConsole from '../consoles/ChatConsole.jsx';
 import SystemConsole from '../consoles/SystemConsole.jsx';
+import VoiceConsole from '../consoles/VoiceConsole.jsx';
 import CertWarningBanner from '../common/CertWarningBanner.jsx';
 import { version as APP_VERSION, author as APP_AUTHOR } from '../../../package.json';
 
@@ -22,7 +23,7 @@ import { version as APP_VERSION, author as APP_AUTHOR } from '../../../package.j
  * Console panels dock at the bottom and can be popped out.
  */
 export default function AppShell({ children, theme, onToggleTheme }) {
-  const { pvwsClient, devices, config } = useApp();
+  const { pvwsClient, devices, config, voiceConfig } = useApp();
   const connected = usePvwsStatus(pvwsClient);
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';
@@ -44,6 +45,9 @@ export default function AppShell({ children, theme, onToggleTheme }) {
   const [systemOpen, setSystemOpen] = useState(false);
   const [chatDetached, setChatDetached] = useState(false);
   const [systemDetached, setSystemDetached] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceDetached, setVoiceDetached] = useState(false);
+  const voiceEnabled = !!voiceConfig?.enabled;
 
   // Help panel
   const [helpOpen, setHelpOpen] = useState(false);
@@ -81,17 +85,24 @@ export default function AppShell({ children, theme, onToggleTheme }) {
   // Check if any route in a group is active
   const groupActive = (paths) => paths.some(p => location.pathname === p);
 
+  const controlsPaths = ['/dashboard', '/beamline', '/layout', '/softioc'];
+  const controlsItems = [
+    { to: '/dashboard',   icon: '📊', label: 'Dashboards' },
+    { to: '/beamline',    icon: '🔬', label: 'Beamline' },
+    { to: '/layout',      icon: '🗺', label: 'Layout' },
+    { to: '/softioc',     icon: '🧩', label: 'SoftIOC' },
+  ];
+  if (voiceEnabled) {
+    controlsPaths.push('/argus');
+    controlsItems.push({ to: '/argus', icon: '🎙', label: 'Argus' });
+  }
+
   const NAV_GROUPS = [
     {
       label: 'Controls',
       icon: '🎛',
-      paths: ['/dashboard', '/beamline', '/layout', '/softioc'],
-      items: [
-        { to: '/dashboard',   icon: '📊', label: 'Dashboards' },
-        { to: '/beamline',    icon: '🔬', label: 'Beamline' },
-        { to: '/layout',      icon: '🗺', label: 'Layout' },
-        { to: '/softioc',     icon: '🧩', label: 'SoftIOC' },
-      ],
+      paths: controlsPaths,
+      items: controlsItems,
     },
     {
       label: 'Monitor',
@@ -179,6 +190,15 @@ export default function AppShell({ children, theme, onToggleTheme }) {
           >
             🖥
           </button>
+          {voiceEnabled && (
+            <button
+              className={`console-toggle-btn ${voiceOpen ? 'active' : ''}`}
+              onClick={() => { setVoiceOpen(o => !o); setVoiceDetached(false); }}
+              title="Voice Assistant"
+            >
+              🎙
+            </button>
+          )}
           <button
             className={`console-toggle-btn ${helpOpen ? 'active' : ''}`}
             onClick={() => setHelpOpen(h => !h)}
@@ -225,6 +245,13 @@ export default function AppShell({ children, theme, onToggleTheme }) {
           detached={systemDetached}
           onDetach={() => setSystemDetached(true)}
           onClose={() => { setSystemOpen(false); setSystemDetached(false); }}
+        />
+      )}
+      {voiceEnabled && voiceOpen && (
+        <VoiceConsole
+          detached={voiceDetached}
+          onDetach={() => setVoiceDetached(true)}
+          onClose={() => { setVoiceOpen(false); setVoiceDetached(false); }}
         />
       )}
 

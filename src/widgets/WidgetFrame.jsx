@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getWidgetType } from './registry.js';
 import { usePv } from '../hooks/usePv.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useVoiceHighlight } from '../context/VoiceHighlightContext.jsx';
 import CreateTicketModal from '../components/common/CreateTicketModal.jsx';
 import ChannelInfoDialog from '../components/common/ChannelInfoDialog.jsx';
 
@@ -121,10 +122,18 @@ const WidgetFrame = forwardRef(function WidgetFrame(
   const ledClass = !hasPv ? '' :
     isConnected ? 'widget-led--connected' : 'widget-led--disconnected';
 
+  // Voice assistant highlight — set when the agent mentions/acts on this
+  // device over the LiveKit data channel (see VoiceHighlightContext).
+  // Applies to every widget by construction since WidgetFrame wraps all of
+  // them; see src/voice/README.md for narrowing this to specific families.
+  const { isHighlighted } = useVoiceHighlight();
+  const voiceHighlightClass = isHighlighted(widget.config?.pvPrefix, widget.config?.deviceId)
+    ? 'widget--voice-highlight' : '';
+
   return (
     <div
       ref={ref}
-      className={`widget ${alarmClass} ${collapsed ? 'widget--collapsed' : ''} ${frameless ? 'widget--frameless' : ''} ${className || ''}`}
+      className={`widget ${alarmClass} ${voiceHighlightClass} ${collapsed ? 'widget--collapsed' : ''} ${frameless ? 'widget--frameless' : ''} ${className || ''}`}
       style={style}
       onContextMenu={handleContextMenu}
       {...rest}

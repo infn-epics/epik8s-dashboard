@@ -768,6 +768,266 @@ body,
   bottom: 302px;
 }
 
+/* ===== Voice Console (experimental) ===== */
+.voice-console-body {
+  padding: 8px 12px;
+}
+
+.voice-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.voice-transcript-line {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.voice-transcript-role {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.voice-transcript-line--assistant .voice-transcript-role {
+  color: var(--accent);
+}
+
+.voice-transcript-line--partial {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.voice-console-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.voice-state-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.voice-fab-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.voice-fab-btn:active {
+  transform: scale(0.94);
+}
+
+.voice-fab-btn--listening {
+  background: var(--red);
+  border-color: var(--red);
+  animation: voice-highlight-pulse 1.2s ease-in-out infinite;
+}
+
+.voice-fab-btn--thinking {
+  border-color: var(--orange);
+}
+
+.voice-fab-btn--speaking {
+  border-color: var(--green);
+}
+
+.voice-fab-btn--error,
+.voice-fab-btn--offline {
+  border-color: var(--text-dim);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-confirm-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(251, 191, 36, 0.12);
+  border-bottom: 1px solid var(--orange);
+}
+
+.voice-confirm-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.voice-confirm-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.voice-confirm-btn {
+  border: none;
+  border-radius: var(--radius);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.voice-confirm-btn--yes {
+  background: var(--green);
+  color: #06281c;
+}
+
+.voice-confirm-btn--no {
+  background: var(--surface-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* ===== Argus full-page view (Controls → Argus) ===== */
+.argus-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 24px;
+}
+
+.argus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.argus-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.argus-title-icon {
+  font-size: 22px;
+}
+
+.argus-title h1 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.argus-reconnect-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.argus-body {
+  flex: 1;
+  display: flex;
+  gap: 20px;
+  min-height: 0;
+  padding-top: 16px;
+}
+
+.argus-transcript-panel {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.argus-mic-panel {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.argus-mic-panel .voice-fab-btn {
+  width: 96px;
+  height: 96px;
+  font-size: 36px;
+}
+
+.argus-state-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.argus-mic-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.argus-view--disabled {
+  align-items: center;
+  justify-content: center;
+}
+
+.argus-disabled-card {
+  margin: auto;
+  max-width: 480px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+}
+
+.argus-disabled-icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.argus-disabled-card h2 {
+  margin-bottom: 8px;
+}
+
+.argus-disabled-card p {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.argus-disabled-card code {
+  background: var(--surface-hover);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+}
+
 .navbar-status {
   display: flex;
   align-items: center;
@@ -1016,6 +1276,17 @@ body,
 .widget--disconnected {
   border-left: 3px solid var(--text-dim);
   opacity: 0.6;
+}
+
+.widget--voice-highlight {
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+  animation: voice-highlight-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes voice-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(56, 189, 248, 0.35); }
+  50% { box-shadow: 0 0 18px rgba(56, 189, 248, 0.75); }
 }
 
 .widget--collapsed .widget-body {

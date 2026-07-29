@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { loadConfig, loadStoredGitConfig, saveGitConfig, clearGitConfig } from '../services/configLoader.js';
 import PvwsClient from '../services/pvws.js';
 import ArchiverClient from '../services/archiver.js';
@@ -28,6 +28,52 @@ function buildPvwsUrl(pvwsParam, pvwsConfig) {
   }
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${window.location.hostname}/pvws/pv`;
+}
+
+const VOICE_LS_KEY = 'epik8s-voice-overrides';
+
+function loadVoiceOverrides() {
+  try {
+    const raw = localStorage.getItem(VOICE_LS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveVoiceOverrides(overrides) {
+  localStorage.setItem(VOICE_LS_KEY, JSON.stringify(overrides));
+}
+
+/**
+ * Resolve the experimental voice-assistant config from
+ * config.epicsConfiguration.services.voiceAssistant, with ?voice=1/0 and
+ * ?voiceToken= query-param overrides persisted to localStorage — mirrors
+ * the ?pvws=/?archiver= override pattern used for dataSources above, for
+ * local dev testing against a LiveKit backend without editing values.yaml.
+ * Disabled by default (ENABLE_VOICE_ASSISTANT-equivalent feature flag).
+ */
+function buildVoiceConfig(config, params) {
+  const va = config?.epicsConfiguration?.services?.voiceAssistant || {};
+  const voiceParam = params.get('voice');
+  const voiceTokenParam = params.get('voiceToken');
+  const voiceServerParam = params.get('voiceServer');
+  const voiceRoomParam = params.get('voiceRoom');
+
+  const overrides = loadVoiceOverrides();
+  if (voiceParam === '1' || voiceParam === 'true') overrides.enabled = true;
+  else if (voiceParam === '0' || voiceParam === 'false') overrides.enabled = false;
+  if (voiceTokenParam) overrides.tokenEndpoint = voiceTokenParam;
+  if (voiceServerParam) overrides.serverUrl = voiceServerParam;
+  if (voiceRoomParam) overrides.roomName = voiceRoomParam;
+  if (voiceParam !== null || voiceTokenParam || voiceServerParam || voiceRoomParam) saveVoiceOverrides(overrides);
+
+  return {
+    enabled: overrides.enabled ?? (va.enabled === true),
+    tokenEndpoint: overrides.tokenEndpoint || va.tokenEndpoint || '',
+    serverUrl: overrides.serverUrl || va.serverUrl || '',
+    roomName: overrides.roomName || va.roomName || '',
+    identityPrefix: va.identityPrefix || 'operator',
+    highlightTtlMs: va.highlightTtlMs,
+  };
 }
 
 function buildArchiverUrl(config) {
@@ -197,6 +243,11 @@ export function AppProvider({ children }) {
 
   const storedGit = loadStoredGitConfig();
 
+  const voiceConfig = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return buildVoiceConfig(config, params);
+  }, [config]);
+
   const value = {
     config,
     devices,
@@ -207,6 +258,7 @@ export function AppProvider({ children }) {
     pvwsClient: pvwsRef.current,
     archiverClient: archiverRef.current,
     dataSources,
+    voiceConfig,
     updateDataSources,
     resetDataSources,
     refreshConfig,
