@@ -4,7 +4,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   voiceStateToIcon,
   voiceStateToLabel,
+  visualPhaseToIcon,
+  visualPhaseToLabel,
   VoiceFabButton,
+  VoiceOrb,
+  DebugPhasePanel,
   ConfirmationBanner,
   TranscriptPanel,
 } from '../src/components/consoles/voiceConsoleUI.jsx';
@@ -38,6 +42,61 @@ describe('VoiceFabButton', () => {
       <VoiceFabButton state="idle" connected={false} onPressStart={() => {}} onPressEnd={() => {}} />
     );
     expect(html).toContain('disabled');
+  });
+});
+
+describe('visual phase mapping', () => {
+  it('maps every phase to a distinct icon and label', () => {
+    const phases = ['idle', 'listening', 'stt', 'llm', 'tts', 'error'];
+    const icons = phases.map(visualPhaseToIcon);
+    const labels = phases.map(visualPhaseToLabel);
+    expect(new Set(icons).size).toBe(phases.length);
+    expect(new Set(labels).size).toBe(phases.length);
+  });
+
+  it('falls back to idle for an unknown phase', () => {
+    expect(visualPhaseToIcon('bogus')).toBe(visualPhaseToIcon('idle'));
+  });
+});
+
+describe('VoiceOrb', () => {
+  it('renders a distinct class per visualPhase and is enabled when connected', () => {
+    const html = renderToStaticMarkup(
+      <VoiceOrb visualPhase="llm" connected onPressStart={() => {}} onPressEnd={() => {}} />
+    );
+    expect(html).toContain(visualPhaseToIcon('llm'));
+    expect(html).not.toContain('disabled');
+    expect(html).toContain('voice-orb--llm');
+  });
+
+  it('is disabled when not connected', () => {
+    const html = renderToStaticMarkup(
+      <VoiceOrb visualPhase="idle" connected={false} onPressStart={() => {}} onPressEnd={() => {}} />
+    );
+    expect(html).toContain('disabled');
+  });
+});
+
+describe('DebugPhasePanel', () => {
+  it('shows an empty state with no recent turns and no live phase', () => {
+    const html = renderToStaticMarkup(
+      <DebugPhasePanel recentTurns={[]} liveDurationMs={null} visualPhase="idle" />
+    );
+    expect(html).toContain('Nessun turno registrato');
+  });
+
+  it('renders per-phase durations and an in-progress marker for null values', () => {
+    const html = renderToStaticMarkup(
+      <DebugPhasePanel
+        recentTurns={[{ turnId: 't1', sttMs: 150, llmMs: null, ttsMs: 300, roundTripMs: null }]}
+        liveDurationMs={420}
+        visualPhase="llm"
+      />
+    );
+    expect(html).toContain('150 ms');
+    expect(html).toContain('300 ms');
+    expect(html).toContain('420 ms');
+    expect(html).toContain('…');
   });
 });
 

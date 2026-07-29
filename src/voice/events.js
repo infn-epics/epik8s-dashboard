@@ -12,7 +12,16 @@ export const EVENT_TYPES = {
   TRANSCRIPT: 'transcript',
   CONFIRM_REQUEST: 'confirm_request',
   CONFIRM_ACTION: 'confirm_action',
+  PHASE: 'phase',
 };
+
+const PHASES = ['stt', 'llm', 'tts'];
+const EDGES = ['start', 'end'];
+
+// Recent-turns list is capped so a long control-room session doesn't grow
+// this unboundedly - only the debug panel's "recent turns" table needs
+// history, and it never shows more than a handful anyway.
+const MAX_TRACKED_TURNS = 20;
 
 export const DEFAULT_HIGHLIGHT_TTL_MS = 8000;
 export const DEFAULT_CONFIRM_TIMEOUT_MS = 15000;
@@ -35,6 +44,13 @@ export function isConfirmRequestEvent(msg) {
   return !!msg && msg.type === EVENT_TYPES.CONFIRM_REQUEST
     && typeof msg.action_id === 'string' && !!msg.action_id
     && typeof msg.label === 'string';
+}
+
+export function isPhaseEvent(msg) {
+  return !!msg && msg.type === EVENT_TYPES.PHASE
+    && typeof msg.turn_id === 'string' && !!msg.turn_id
+    && PHASES.includes(msg.phase)
+    && EDGES.includes(msg.edge);
 }
 
 function normalize(id) {
@@ -94,6 +110,80 @@ export function upsertHighlight(list, msg, now = Date.now()) {
 
 export function pruneExpired(list, now = Date.now()) {
   return list.filter((h) => h.expiresAt > now);
+}
+
+/**
+ * Pure reducer for the phase-timing/debug-latency-panel feature. Applies
+ * one `phase` event to a capped list of per-turn phase timestamps.
+ *
+ * Semantics deliberately match the backend's documented caveat (see
+ * events.py's send_phase docstring): 'llm' may fire more than one
+ * start/end pair for a single turn_id when the model performs a tool
+ * call mid-turn. To make that produce one sensible duration rather than
+ * garbage: on edge:'start' the timestamp is set only if not already set
+ * (idempotent-first-start, so a second start doesn't reset the clock);
+ * on edge:'end' the timestamp is always overwritten (idempotent-last-end,
+ * so the final duration spans first-start to the *last* end, covering
+ * the whole tool-call detour).
+ */
+export function reducePhaseEvent(turns, msg, now = Date.now()) {
+  if (!isPhaseEvent(msg)) return turns;
+
+  const idx = turns.findIndex((t) => t.turnId === msg.turn_id);
+  const existing = idx === -1
+    ? { turnId: msg.turn_id, phases: { stt: {}, llm: {}, tts: {} } }
+    : turns[idx];
+
+  const phaseTimes = { ...existing.phases[msg.phase] };
+  if (msg.edge === 'start') {
+    if (phaseTimes.start === undefined) phaseTimes.start = msg.ts;
+  } else {
+    phaseTimes.end = msg.ts;
+  }
+
+  const updated = { ...existing, phases: { ...existing.phases, [msg.phase]: phaseTimes } };
+
+  let next;
+  if (idx === -1) {
+    next = [...turns, updated];
+  } else {
+    next = [...turns.slice(0, idx), updated, ...turns.slice(idx + 1)];
+  }
+
+  if (next.length > MAX_TRACKED_TURNS) {
+    next = next.slice(next.length - MAX_TRACKED_TURNS);
+  }
+  return next;
+}
+
+/**
+ * Derive {sttMs, llmMs, ttsMs, roundTripMs} from one reducePhaseEvent turn
+ * entry. Any phase still missing an `end` (or never started) yields null
+ * for that field, not NaN/Infinity - callers render that as "in progress"
+ * rather than a bogus number.
+ */
+export function computeTurnDurations(turn) {
+  const durations = {};
+  let firstStart;
+  let lastEnd;
+
+  for (const phase of PHASES) {
+    const { start, end } = turn?.phases?.[phase] || {};
+    const key = `${phase}Ms`;
+    if (typeof start === 'number' && typeof end === 'number') {
+      durations[key] = end - start;
+      if (firstStart === undefined || start < firstStart) firstStart = start;
+      if (lastEnd === undefined || end > lastEnd) lastEnd = end;
+    } else {
+      durations[key] = null;
+    }
+  }
+
+  durations.roundTripMs = firstStart !== undefined && lastEnd !== undefined
+    ? lastEnd - firstStart
+    : null;
+
+  return durations;
 }
 
 // Capped linear-ish backoff for the LiveKit room connection: WebRTC/SFU

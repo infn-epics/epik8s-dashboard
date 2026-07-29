@@ -13,12 +13,14 @@ actions — they only forward a confirm/cancel event to the agent.
 
 ## Files
 
-- `src/voice/events.js` — event schemas, `matchDeviceId`, backoff/TTL pure helpers (framework-free, unit-tested in `tests/voiceEvents.test.js`, `tests/voiceHighlight.test.js`).
+- `src/voice/events.js` — event schemas, `matchDeviceId`, backoff/TTL pure helpers, phase-timing reducers (framework-free, unit-tested in `tests/voiceEvents.test.js`, `tests/voiceHighlight.test.js`, `tests/voicePhaseReducer.test.js`).
 - `src/services/voiceRoom.js` — `VoiceRoomClient`, the LiveKit room connection (mirrors `PvwsClient`'s shape).
 - `src/context/VoiceContext.jsx` — owns the `VoiceRoomClient` instance, exposes connection status.
 - `src/context/VoiceHighlightContext.jsx` — tracks `highlight` events, exposes `isHighlighted(pvPrefix, deviceId)` to widgets.
+- `src/context/VoicePhaseContext.jsx` — tracks `phase` events (STT/LLM/TTS start/end per turn), exposes `{ turns, currentTurn }` for the Jarvis-like animation and debug latency panel.
 - `src/hooks/useVoiceAssistant.js` — push-to-talk state machine, transcript, confirmation flow.
-- `src/components/consoles/VoiceConsole.jsx` + `voiceConsoleUI.jsx` — the floating console (FAB, transcript panel, confirmation banner).
+- `src/hooks/useVoicePhase.js` — derives a finer-grained `visualPhase` (idle/listening/stt/llm/tts/error) plus per-turn latency numbers from `useVoiceAssistant()`'s state and `VoicePhaseContext`.
+- `src/components/consoles/VoiceConsole.jsx` + `voiceConsoleUI.jsx` — the floating console (animated orb, transcript panel, confirmation banner, debug latency panel).
 
 ## Enabling the flag
 
@@ -49,8 +51,9 @@ http://localhost:5173/dashboard?voice=1&voiceToken=http://localhost:8788/token&v
 - `?voiceToken=<url>` — override the token endpoint.
 - `?voiceServer=<ws url>` — override the LiveKit media server WS URL.
 - `?voiceRoom=<name>` — override the room name.
+- `?voiceDebug=1` / `?voiceDebug=0` — force the debug latency panel on/off (also settable permanently for a beamline via `voiceAssistant.debug: true` in `values.yaml`).
 
-All four persist to `localStorage` (`epik8s-voice-overrides`) so you only
+All five persist to `localStorage` (`epik8s-voice-overrides`) so you only
 need to pass them once.
 
 ## Testing against a local LiveKit backend
@@ -78,8 +81,9 @@ script, standing in for the Python agent.
    { "type": "highlight", "device_id": "EUAPS:CTRL:FPMMIR:HMOT01", "reason": "test", "ttl_ms": 8000 }
    { "type": "transcript", "role": "assistant", "text": "sto muovendo il motore", "final": true }
    { "type": "confirm_request", "action_id": "a1", "label": "Spegnere il magnete Q1?" }
+   { "type": "phase", "turn_id": "t1", "phase": "stt", "edge": "start", "ts": 1690454400000 }
    ```
-   `highlight` pulses the matching widget's border for `ttl_ms`; `transcript` appends to the console's history panel; `confirm_request` opens the Conferma/Annulla banner (clicking either sends `confirm_action` back over the data channel and clears the banner — nothing is executed locally).
+   `highlight` pulses the matching widget's border for `ttl_ms`; `transcript` appends to the console's history panel; `confirm_request` opens the Conferma/Annulla banner (clicking either sends `confirm_action` back over the data channel and clears the banner — nothing is executed locally); `phase` (with `?voiceDebug=1`) drives the animated orb and populates the debug latency panel — send a full `stt`→`llm`→`tts` start/end sequence (see the Event schemas section below) to see it animate through all four visual states.
 
 ## Event schemas
 
@@ -90,9 +94,11 @@ All events are JSON over the LiveKit data channel.
 { "type": "highlight", "device_id": "IOC1:MOT01", "reason": "Motore fuori posizione", "ttl_ms": 8000 }
 ```
 
-**`transcript`** (agent → frontend) — user/assistant speech, partial or final:
+**`transcript`** (agent → frontend) — user/assistant speech, partial or final. `metrics` is optional (present only when the backend's `ChatMessage.metrics` had usable data for that turn) — a flat `{field_name_ms: number}` dict, field set depends on role (see `agent.py`'s `_extract_metrics`):
 ```json
 { "type": "transcript", "role": "user", "text": "porta il motore a zero", "final": false }
+{ "type": "transcript", "role": "assistant", "text": "fatto", "final": true,
+  "metrics": { "llm_ttft_ms": 380, "tts_ttfb_ms": 190, "e2e_latency_ms": 2210 } }
 ```
 
 **`confirm_request`** (agent → frontend) — triggers the confirmation banner:
@@ -106,6 +112,12 @@ All events are JSON over the LiveKit data channel.
 ```
 The frontend never executes anything here — it only forwards the operator's
 choice. Real execution and audit logging stay entirely backend/MCP-side.
+
+**`phase`** (agent → frontend) — fine-grained STT/LLM/TTS phase transitions for the Jarvis-like animation and debug latency panel, keyed by `turn_id`:
+```json
+{ "type": "phase", "turn_id": "3f9a1c2e...", "phase": "stt", "edge": "start", "ts": 1690454400000 }
+```
+`phase` is one of `stt`/`llm`/`tts`, `edge` is `start`/`end`. **`llm` may fire more than one start/end pair for a single `turn_id`** when the model performs a tool call mid-turn — this is expected, not a bug (confirmed live against the deployed livekit-agents version). `reducePhaseEvent`/`computeTurnDurations` in `events.js` handle this: `start` is idempotent-first (a repeated start doesn't reset the clock), `end` is idempotent-last (duration spans first-start to the final end, covering the whole tool-call detour).
 
 ## Known open questions
 

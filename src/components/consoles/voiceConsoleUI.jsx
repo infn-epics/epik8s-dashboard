@@ -49,6 +49,105 @@ export function VoiceFabButton({ state, connected, disabled, onPressStart, onPre
   );
 }
 
+// Jarvis-like animated indicator states: finer-grained than VoiceFabButton's
+// 5-state machine (splits "thinking" into stt/llm/tts) so the animation can
+// show what's actually happening while masking perceived latency - see
+// useVoicePhase.js for how visualPhase is derived.
+const PHASE_ICON = {
+  idle: '🎙',
+  listening: '🔴',
+  stt: '👂',
+  llm: '🧠',
+  tts: '🔊',
+  error: '⚠',
+};
+
+const PHASE_LABEL = {
+  idle: 'Pronto',
+  listening: 'In ascolto…',
+  stt: 'Trascrizione…',
+  llm: 'Elaborazione…',
+  tts: 'Risposta…',
+  error: 'Errore connessione',
+};
+
+export function visualPhaseToIcon(visualPhase) {
+  return PHASE_ICON[visualPhase] || PHASE_ICON.idle;
+}
+
+export function visualPhaseToLabel(visualPhase) {
+  return PHASE_LABEL[visualPhase] || PHASE_LABEL.idle;
+}
+
+/**
+ * Press-and-hold mic control, same prop contract/event wiring as
+ * VoiceFabButton plus a visualPhase prop for the finer-grained animation -
+ * a drop-in replacement at call sites, see useVoicePhase.js.
+ */
+export function VoiceOrb({ visualPhase, connected, disabled, onPressStart, onPressEnd }) {
+  return (
+    <button
+      className={`voice-orb voice-orb--${visualPhase} ${!connected ? 'voice-orb--offline' : ''}`}
+      disabled={disabled || !connected}
+      title={connected ? visualPhaseToLabel(visualPhase) : 'Voice assistant disconnesso'}
+      onMouseDown={onPressStart}
+      onMouseUp={onPressEnd}
+      onMouseLeave={onPressEnd}
+      onTouchStart={onPressStart}
+      onTouchEnd={onPressEnd}
+    >
+      <span className="voice-orb-ring" />
+      <span className="voice-orb-icon">{visualPhaseToIcon(visualPhase)}</span>
+    </button>
+  );
+}
+
+function formatMs(ms) {
+  return ms === null || ms === undefined ? '…' : `${Math.round(ms)} ms`;
+}
+
+/**
+ * Debug-mode latency table: per-phase and round-trip ms for recent turns,
+ * plus the in-progress turn's live elapsed time. Gated behind ?voiceDebug=1
+ * at the call site (see AppContext.jsx's buildVoiceConfig).
+ */
+export function DebugPhasePanel({ recentTurns, liveDurationMs, visualPhase }) {
+  const hasLive = liveDurationMs !== null && liveDurationMs !== undefined;
+  return (
+    <div className="voice-debug-panel">
+      {hasLive && (
+        <div className="voice-debug-live">
+          {visualPhaseToLabel(visualPhase)} <strong>{formatMs(liveDurationMs)}</strong>
+        </div>
+      )}
+      {recentTurns.length === 0 ? (
+        <div className="console-empty">Nessun turno registrato</div>
+      ) : (
+        <table className="voice-debug-table">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>LLM</th>
+              <th>TTS</th>
+              <th>Totale</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentTurns.map((turn) => (
+              <tr key={turn.turnId} className="voice-debug-row">
+                <td>{formatMs(turn.sttMs)}</td>
+                <td>{formatMs(turn.llmMs)}</td>
+                <td>{formatMs(turn.ttsMs)}</td>
+                <td>{formatMs(turn.roundTripMs)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 /** Scrollable, collapsible live transcript panel. */
 export function TranscriptPanel({ history, partial }) {
   return (

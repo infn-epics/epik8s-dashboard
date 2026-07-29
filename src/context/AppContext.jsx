@@ -57,6 +57,7 @@ function buildVoiceConfig(config, params) {
   const voiceTokenParam = params.get('voiceToken');
   const voiceServerParam = params.get('voiceServer');
   const voiceRoomParam = params.get('voiceRoom');
+  const voiceDebugParam = params.get('voiceDebug');
 
   const overrides = loadVoiceOverrides();
   if (voiceParam === '1' || voiceParam === 'true') overrides.enabled = true;
@@ -64,7 +65,11 @@ function buildVoiceConfig(config, params) {
   if (voiceTokenParam) overrides.tokenEndpoint = voiceTokenParam;
   if (voiceServerParam) overrides.serverUrl = voiceServerParam;
   if (voiceRoomParam) overrides.roomName = voiceRoomParam;
-  if (voiceParam !== null || voiceTokenParam || voiceServerParam || voiceRoomParam) saveVoiceOverrides(overrides);
+  if (voiceDebugParam === '1' || voiceDebugParam === 'true') overrides.debug = true;
+  else if (voiceDebugParam === '0' || voiceDebugParam === 'false') overrides.debug = false;
+  if (voiceParam !== null || voiceTokenParam || voiceServerParam || voiceRoomParam || voiceDebugParam !== null) {
+    saveVoiceOverrides(overrides);
+  }
 
   return {
     enabled: overrides.enabled ?? (va.enabled === true),
@@ -73,6 +78,10 @@ function buildVoiceConfig(config, params) {
     roomName: overrides.roomName || va.roomName || '',
     identityPrefix: va.identityPrefix || 'operator',
     highlightTtlMs: va.highlightTtlMs,
+    // ?voiceDebug=1/0 overrides values.yaml's voiceAssistant.debug, which
+    // lets a beamline ship with the latency debug panel always-on for ops
+    // staff without needing the query param every session.
+    debug: overrides.debug ?? (va.debug === true),
   };
 }
 

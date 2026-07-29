@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useDraggable } from '../../hooks/useDraggable.js';
+import { useApp } from '../../context/AppContext.jsx';
 import { useVoice } from '../../context/VoiceContext.jsx';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant.js';
-import { VoiceFabButton, TranscriptPanel, ConfirmationBanner, voiceStateToLabel } from './voiceConsoleUI.jsx';
+import { useVoicePhase } from '../../hooks/useVoicePhase.js';
+import { VoiceOrb, TranscriptPanel, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
 
 /**
  * VoiceConsole — floating/dockable panel for the experimental voice
@@ -15,6 +17,7 @@ import { VoiceFabButton, TranscriptPanel, ConfirmationBanner, voiceStateToLabel 
  * an accidental "open mic" left on in a control room.
  */
 export default function VoiceConsole({ detached, onDetach, onClose }) {
+  const { voiceConfig } = useApp();
   const { connectionStatus, connect } = useVoice();
   const {
     state,
@@ -25,6 +28,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
     stopTalk,
     respondConfirm,
   } = useVoiceAssistant();
+  const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
   const { panelRef, onHeaderMouseDown } = useDraggable(detached);
 
   // Safety net: releasing the mouse outside the FAB must still stop the mic.
@@ -71,10 +75,14 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
         <TranscriptPanel history={transcriptHistory} partial={partialTranscript} />
       </div>
 
+      {voiceConfig?.debug && (
+        <DebugPhasePanel recentTurns={recentTurns} liveDurationMs={liveDurationMs} visualPhase={visualPhase} />
+      )}
+
       <div className="voice-console-footer">
-        <span className="voice-state-label">{voiceStateToLabel(state)}</span>
-        <VoiceFabButton
-          state={state}
+        <span className="voice-state-label">{visualPhaseToLabel(visualPhase)}</span>
+        <VoiceOrb
+          visualPhase={visualPhase}
           connected={connected}
           onPressStart={startTalk}
           onPressEnd={stopTalk}

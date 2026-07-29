@@ -3,6 +3,7 @@ import {
   isHighlightEvent,
   isTranscriptEvent,
   isConfirmRequestEvent,
+  isPhaseEvent,
   matchDeviceId,
   computeBackoffDelay,
   MAX_RECONNECT_ATTEMPTS,
@@ -28,6 +29,20 @@ describe('type guards', () => {
   it('accepts a well-formed confirm_request', () => {
     expect(isConfirmRequestEvent({ type: 'confirm_request', action_id: 'a1', label: 'Spegnere Q1?' })).toBe(true);
     expect(isConfirmRequestEvent({ type: 'confirm_request', action_id: '', label: 'x' })).toBe(false);
+  });
+
+  it('accepts well-formed phase events', () => {
+    expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'stt', edge: 'start', ts: 1 })).toBe(true);
+    expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'llm', edge: 'end', ts: 2 })).toBe(true);
+    expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'tts', edge: 'start', ts: 3 })).toBe(true);
+  });
+
+  it('rejects malformed phase events', () => {
+    expect(isPhaseEvent(null)).toBe(false);
+    expect(isPhaseEvent({ type: 'phase', turn_id: '', phase: 'stt', edge: 'start' })).toBe(false);
+    expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'unknown', edge: 'start' })).toBe(false);
+    expect(isPhaseEvent({ type: 'phase', turn_id: 't1', phase: 'stt', edge: 'unknown' })).toBe(false);
+    expect(isPhaseEvent({ type: 'transcript', turn_id: 't1', phase: 'stt', edge: 'start' })).toBe(false);
   });
 });
 

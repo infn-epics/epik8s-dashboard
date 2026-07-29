@@ -1,7 +1,8 @@
 import { useApp } from '../../context/AppContext.jsx';
 import { useVoice } from '../../context/VoiceContext.jsx';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant.js';
-import { VoiceFabButton, TranscriptPanel, ConfirmationBanner, voiceStateToLabel } from '../consoles/voiceConsoleUI.jsx';
+import { useVoicePhase } from '../../hooks/useVoicePhase.js';
+import { VoiceOrb, TranscriptPanel, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
 
 /**
  * ArgusView — full-page voice interaction with ARGUS, the accelerator
@@ -23,6 +24,7 @@ export default function ArgusView() {
     stopTalk,
     respondConfirm,
   } = useVoiceAssistant();
+  const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
 
   const connected = connectionStatus === 'connected';
 
@@ -66,16 +68,19 @@ export default function ArgusView() {
       <div className="argus-body">
         <div className="argus-transcript-panel">
           <TranscriptPanel history={transcriptHistory} partial={partialTranscript} />
+          {voiceConfig?.debug && (
+            <DebugPhasePanel recentTurns={recentTurns} liveDurationMs={liveDurationMs} visualPhase={visualPhase} />
+          )}
         </div>
 
         <div className="argus-mic-panel">
-          <VoiceFabButton
-            state={state}
+          <VoiceOrb
+            visualPhase={visualPhase}
             connected={connected}
             onPressStart={startTalk}
             onPressEnd={stopTalk}
           />
-          <span className="argus-state-label">{voiceStateToLabel(state)}</span>
+          <span className="argus-state-label">{visualPhaseToLabel(visualPhase)}</span>
           <span className="argus-mic-hint">Tieni premuto per parlare</span>
         </div>
       </div>

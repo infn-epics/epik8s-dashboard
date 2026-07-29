@@ -21,6 +21,7 @@ import ArgusView from './components/views/ArgusView.jsx';
 import { SoftIOCProvider } from './context/SoftIOCContext.jsx';
 import { VoiceProvider } from './context/VoiceContext.jsx';
 import { VoiceHighlightProvider } from './context/VoiceHighlightContext.jsx';
+import { VoicePhaseProvider } from './context/VoicePhaseContext.jsx';
 
 /** Top-level error boundary: catches crashes and shows a readable message. */
 class AppErrorBoundary extends Component {
@@ -102,24 +103,26 @@ function AppRoutes() {
         <SoftIOCProvider>
           <VoiceProvider>
             <VoiceHighlightProvider>
-              <AppShell theme={theme} onToggleTheme={toggleTheme}>
-                <Routes>
-                  <Route path="/dashboard" element={<DashboardView />} />
-                  <Route path="/cameras" element={<CameraView />} />
-                  <Route path="/instrumentation" element={<InstrumentationView />} />
-                  <Route path="/beamline" element={<BeamlineView />} />
-                  <Route path="/layout" element={<BeamlineLayoutView />} />
-                  <Route path="/settings" element={<SettingsView />} />
-                  <Route path="/tickets" element={<TicketsView />} />
-                  <Route path="/k8s" element={<K8sView />} />
-                  <Route path="/channels" element={<ChannelBrowserView />} />
-                  <Route path="/softioc" element={<SoftIOCView />} />
-                  <Route path="/argus" element={<ArgusView />} />
-                  <Route path="/ops/files" element={<OpsFilesView />} />
-                  <Route path="/ops/archiver" element={<OpsArchiverView />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </AppShell>
+              <VoicePhaseProvider>
+                <AppShell theme={theme} onToggleTheme={toggleTheme}>
+                  <Routes>
+                    <Route path="/dashboard" element={<DashboardView />} />
+                    <Route path="/cameras" element={<CameraView />} />
+                    <Route path="/instrumentation" element={<InstrumentationView />} />
+                    <Route path="/beamline" element={<BeamlineView />} />
+                    <Route path="/layout" element={<BeamlineLayoutView />} />
+                    <Route path="/settings" element={<SettingsView />} />
+                    <Route path="/tickets" element={<TicketsView />} />
+                    <Route path="/k8s" element={<K8sView />} />
+                    <Route path="/channels" element={<ChannelBrowserView />} />
+                    <Route path="/softioc" element={<SoftIOCView />} />
+                    <Route path="/argus" element={<ArgusView />} />
+                    <Route path="/ops/files" element={<OpsFilesView />} />
+                    <Route path="/ops/archiver" element={<OpsArchiverView />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </AppShell>
+              </VoicePhaseProvider>
             </VoiceHighlightProvider>
           </VoiceProvider>
         </SoftIOCProvider>
