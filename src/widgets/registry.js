@@ -329,6 +329,7 @@ const WIDGET_TYPES = {
       { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
       { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },
       { key: 'showCharge', label: 'Show Charge', type: 'boolean', default: true, group: 'Widget' },
+      { key: 'plotWindowSec', label: 'Realtime Plot Window (s)', type: 'number', default: 60, group: 'Widget' },
     ]),
     component: BPMWidget,
   },
@@ -385,6 +386,12 @@ const WIDGET_TYPES = {
     properties: props(PV_PREFIX_PROPERTIES, STYLE_PROPERTIES, VIEW_MODE_PROPERTY, [
       { key: 'maxCurrent', label: 'Max Current (A)', type: 'number', default: 100, group: 'Widget' },
       { key: 'maxVoltage', label: 'Max Voltage (V)', type: 'number', default: 50, group: 'Widget' },
+      // Bipolar power supplies are the common case for magnets (polarity
+      // reversal via sign, not a separate DIR PV) - default the setpoint
+      // floor to -max rather than 0. minCurrent/minVoltage override this
+      // for genuinely unipolar supplies (set to 0) or asymmetric ranges.
+      { key: 'minCurrent', label: 'Min Current (A)', type: 'number', default: null, group: 'Widget' },
+      { key: 'minVoltage', label: 'Min Voltage (V)', type: 'number', default: null, group: 'Widget' },
       { key: 'precision', label: 'Precision', type: 'number', default: 3, group: 'Widget' },
       { key: 'format', label: 'Format', type: 'select', default: 'decimal', options: ['decimal', 'exponential', 'engineering', 'hex', 'string'], group: 'Widget' },
       { key: 'showUnits', label: 'Show EGU', type: 'boolean', default: true, group: 'Widget' },

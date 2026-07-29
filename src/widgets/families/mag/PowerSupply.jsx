@@ -93,7 +93,7 @@ export default function PowerSupplyWidget({ config, client }) {
           client={client}
           pvName={pvPrefix ? `${pvPrefix}:CURRENT_SP` : ''}
           label="I set"
-          min={0}
+          min={config.minCurrent ?? -(config.maxCurrent ?? 100)}
           max={config.maxCurrent ?? 100}
           step={0.01}
         />
@@ -101,7 +101,7 @@ export default function PowerSupplyWidget({ config, client }) {
           client={client}
           pvName={pvPrefix ? `${pvPrefix}:VOLTAGE_SP` : ''}
           label="V set"
-          min={0}
+          min={config.minVoltage ?? -(config.maxVoltage ?? 50)}
           max={config.maxVoltage ?? 50}
           step={0.01}
         />
