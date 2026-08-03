@@ -17,7 +17,7 @@ import { ChatFeed } from '../consoles/voiceContentUI.jsx';
  * just a larger, page-level presentation of the same live session.
  */
 export default function ArgusView() {
-  const { voiceConfig } = useApp();
+  const { voiceConfig, pvwsClient } = useApp();
   const { connectionStatus, connect } = useVoice();
   const {
     state,
@@ -73,7 +73,7 @@ export default function ArgusView() {
 
       <div className="argus-body">
         <div className="argus-transcript-panel">
-          <ChatFeed entries={feedEntries} partial={partialTranscript} />
+          <ChatFeed entries={feedEntries} partial={partialTranscript} client={pvwsClient} />
           {voiceConfig?.debug && (
             <DebugPhasePanel recentTurns={recentTurns} liveDurationMs={liveDurationMs} visualPhase={visualPhase} />
           )}

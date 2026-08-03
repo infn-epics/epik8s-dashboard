@@ -20,7 +20,7 @@ import { ChatFeed } from './voiceContentUI.jsx';
  * an accidental "open mic" left on in a control room.
  */
 export default function VoiceConsole({ detached, onDetach, onClose }) {
-  const { voiceConfig } = useApp();
+  const { voiceConfig, pvwsClient } = useApp();
   const { connectionStatus, connect } = useVoice();
   const {
     state,
@@ -77,7 +77,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
       )}
 
       <div className="console-body voice-console-body">
-        <ChatFeed entries={feedEntries} partial={partialTranscript} />
+        <ChatFeed entries={feedEntries} partial={partialTranscript} client={pvwsClient} />
       </div>
 
       {voiceConfig?.debug && (

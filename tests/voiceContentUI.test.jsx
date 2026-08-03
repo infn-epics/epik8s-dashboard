@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ContentChartBlock, ContentTableBlock, ContentBlock, ChatFeed } from '../src/components/consoles/voiceContentUI.jsx';
+import { ContentChartBlock, ContentTableBlock, ContentWidgetBlock, ContentBlock, ChatFeed } from '../src/components/consoles/voiceContentUI.jsx';
 
 const chartContent = {
   type: 'content',
@@ -87,6 +87,33 @@ describe('ContentTableBlock', () => {
   });
 });
 
+const widgetContent = {
+  type: 'content',
+  kind: 'widget',
+  tool: 'sparc-argus__get_device',
+  title: 'GUNSOL01 (mag)',
+  device_id: 'SPARC:MAG:HZ:GUNSOL01',
+  pv_prefix: 'SPARC:MAG:HZ:GUNSOL01',
+  widget_type: 'power-supply',
+  config: { pvPrefix: 'SPARC:MAG:HZ:GUNSOL01', viewMode: 'essential' },
+  ts: 1000,
+};
+
+describe('ContentWidgetBlock', () => {
+  it('renders the title and the resolved widget component', () => {
+    const html = renderToStaticMarkup(<ContentWidgetBlock content={widgetContent} />);
+    expect(html).toContain('GUNSOL01 (mag)');
+    expect(html).toContain('content-widget-body');
+  });
+
+  it('falls back to the generic widget for an unknown widget_type rather than crashing', () => {
+    const html = renderToStaticMarkup(
+      <ContentWidgetBlock content={{ ...widgetContent, widget_type: 'not-a-real-type' }} />
+    );
+    expect(html).toContain('content-widget-body');
+  });
+});
+
 describe('ContentBlock', () => {
   it('dispatches chart content to ContentChartBlock', () => {
     const html = renderToStaticMarkup(<ContentBlock content={chartContent} />);
@@ -98,8 +125,13 @@ describe('ContentBlock', () => {
     expect(html).toContain('content-block--table');
   });
 
+  it('dispatches widget content to ContentWidgetBlock', () => {
+    const html = renderToStaticMarkup(<ContentBlock content={widgetContent} />);
+    expect(html).toContain('content-block--widget');
+  });
+
   it('renders nothing for an unrecognized/not-yet-implemented kind', () => {
-    const html = renderToStaticMarkup(<ContentBlock content={{ kind: 'widget' }} />);
+    const html = renderToStaticMarkup(<ContentBlock content={{ kind: 'multichoice' }} />);
     expect(html).toBe('');
   });
 });

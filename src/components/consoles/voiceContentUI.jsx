@@ -6,12 +6,13 @@
  * renderToStaticMarkup (see tests/voiceContentUI.test.jsx).
  *
  * Built incrementally per the Phase B plan chunking - ContentChartBlock
- * (B1: get_history -> chart) and ContentTableBlock (B2: list_iocs/
- * search_pvs/list_beamline_devices -> table) exist so far. ContentWidgetBlock
- * (B3) is added in its own pass, not stubbed out ahead of time.
+ * (B1: get_history -> chart), ContentTableBlock (B2: list_iocs/search_pvs/
+ * list_beamline_devices -> table), and ContentWidgetBlock (B3: get_device/
+ * device_status/diagnose_device -> embedded live widget) exist so far.
  */
 import MiniChart from '../common/MiniChart.jsx';
 import { TranscriptLine } from './voiceConsoleUI.jsx';
+import { getWidgetComponent } from '../../widgets/registry.js';
 
 /** Converts a chart content event's columnar {t:[...], v:[...]} series into
  * MiniChart's {x,y} point-array shape, at this component boundary rather
@@ -78,15 +79,38 @@ export function ContentTableBlock({ content, onRowClick }) {
   );
 }
 
+/**
+ * Renders the actual live widget component (Motor, PowerSupply, Vacuum,
+ * ...) picked server-side (see argus_content.py's DEVGROUP_WIDGET_MAP) -
+ * {config, client} only, deliberately no WidgetFrame (that adds a title
+ * bar/edit/screenshot chrome meant for the dashboard's grid layout; this
+ * content block already has its own .content-block-title). client is the
+ * PVWS client, threaded down from the console call site the same way
+ * BeamlineLayout.jsx's DeviceDetail already does.
+ */
+export function ContentWidgetBlock({ content, client }) {
+  const Component = getWidgetComponent(content.widget_type);
+  return (
+    <div className="content-block content-block--widget">
+      <div className="content-block-title">{content.title}</div>
+      <div className="content-widget-body">
+        <Component config={content.config || {}} client={client} />
+      </div>
+    </div>
+  );
+}
+
 /** Kind dispatcher - renders nothing for a kind it doesn't yet know how to
- * render (B3 will extend this), rather than crashing on an unrecognized/
- * not-yet-implemented content kind. */
-export function ContentBlock({ content, onRowClick }) {
+ * render, rather than crashing on an unrecognized/not-yet-implemented
+ * content kind. */
+export function ContentBlock({ content, onRowClick, client }) {
   switch (content.kind) {
     case 'chart':
       return <ContentChartBlock content={content} />;
     case 'table':
       return <ContentTableBlock content={content} onRowClick={onRowClick} />;
+    case 'widget':
+      return <ContentWidgetBlock content={content} client={client} />;
     default:
       return null;
   }
@@ -99,7 +123,7 @@ export function ContentBlock({ content, onRowClick }) {
  * want rich content - TranscriptPanel itself stays available/tested for
  * simpler views.
  */
-export function ChatFeed({ entries, partial, onRowClick }) {
+export function ChatFeed({ entries, partial, onRowClick, client }) {
   return (
     <div className="voice-transcript">
       {entries.length === 0 && !partial && (
@@ -108,7 +132,7 @@ export function ChatFeed({ entries, partial, onRowClick }) {
       {entries.map((entry, i) => (
         entry.kind === 'transcript'
           ? <TranscriptLine key={i} role={entry.role} text={entry.text} />
-          : <ContentBlock key={i} content={entry.content} onRowClick={onRowClick} />
+          : <ContentBlock key={i} content={entry.content} onRowClick={onRowClick} client={client} />
       ))}
       {partial && (
         <TranscriptLine role={partial.role} text={partial.text} partial />

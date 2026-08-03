@@ -1103,6 +1103,12 @@ body,
   background: var(--surface-hover, rgba(127, 127, 127, 0.1));
 }
 
+.content-widget-body {
+  max-height: 260px;
+  overflow: auto;
+  padding: 4px 0;
+}
+
 /* ===== Argus full-page view (Controls → Argus) ===== */
 .argus-view {
   display: flex;
