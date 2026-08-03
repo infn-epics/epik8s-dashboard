@@ -1067,6 +1067,42 @@ body,
   display: block;
 }
 
+.content-table-scroll {
+  overflow-x: auto;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.content-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.content-table th,
+.content-table td {
+  padding: 3px 6px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.content-table th {
+  color: var(--text-dim);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.content-table-row--clickable {
+  cursor: pointer;
+}
+
+.content-table-row--clickable:hover {
+  background: var(--surface-hover, rgba(127, 127, 127, 0.1));
+}
+
 /* ===== Argus full-page view (Controls → Argus) ===== */
 .argus-view {
   display: flex;

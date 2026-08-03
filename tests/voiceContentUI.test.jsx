@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ContentChartBlock, ContentBlock, ChatFeed } from '../src/components/consoles/voiceContentUI.jsx';
+import { ContentChartBlock, ContentTableBlock, ContentBlock, ChatFeed } from '../src/components/consoles/voiceContentUI.jsx';
 
 const chartContent = {
   type: 'content',
@@ -10,6 +10,26 @@ const chartContent = {
   title: 'SPARC:MAG:HZ:GUNSOL01:CURRENT_RB',
   unit: 'A',
   series: [{ label: 'CURRENT_RB', pv: 'SPARC:MAG:HZ:GUNSOL01:CURRENT_RB', t: [1, 2, 3], v: [10, 11, 12] }],
+  ts: 1000,
+};
+
+const tableContent = {
+  type: 'content',
+  kind: 'table',
+  tool: 'sparc-argus__list_beamline_devices',
+  title: 'Devices (2 of 2, devgroup=mag)',
+  columns: ['name', 'devgroup', 'devfunc', 'ioc_name'],
+  rows: [
+    {
+      cells: { name: 'GUNSOL01', devgroup: 'mag', devfunc: 'SOL', ioc_name: 'haz-ser-ch1' },
+      device_id: 'SPARC:MAG:HZ:GUNSOL01',
+      pv_prefix: 'SPARC:MAG:HZ:GUNSOL01',
+      widget_type: 'power-supply',
+    },
+    {
+      cells: { name: 'AC1SOL01', devgroup: 'mag', devfunc: 'SOL', ioc_name: 'haz-ser-ch1' },
+    },
+  ],
   ts: 1000,
 };
 
@@ -35,14 +55,51 @@ describe('ContentChartBlock', () => {
   });
 });
 
+describe('ContentTableBlock', () => {
+  it('renders the title, columns, and cell values', () => {
+    const html = renderToStaticMarkup(<ContentTableBlock content={tableContent} />);
+    expect(html).toContain('Devices (2 of 2, devgroup=mag)');
+    expect(html).toContain('GUNSOL01');
+    expect(html).toContain('AC1SOL01');
+  });
+
+  it('shows a truncation note when rows were dropped', () => {
+    const html = renderToStaticMarkup(
+      <ContentTableBlock content={{ ...tableContent, truncated: { rows: 5 } }} />
+    );
+    expect(html).toContain('5');
+  });
+
+  it('marks rows with a device_id as clickable, others not', () => {
+    const html = renderToStaticMarkup(<ContentTableBlock content={tableContent} onRowClick={() => {}} />);
+    expect(html).toContain('content-table-row--clickable');
+  });
+
+  it('does not mark rows clickable when no onRowClick handler is given', () => {
+    const html = renderToStaticMarkup(<ContentTableBlock content={tableContent} />);
+    // device_id rows still get the class (visual affordance), but no onClick fires without a handler
+    expect(html).toContain('content-table-row--clickable');
+  });
+
+  it('renders without a truncation note when not truncated', () => {
+    const html = renderToStaticMarkup(<ContentTableBlock content={tableContent} />);
+    expect(html).not.toContain('content-block-note');
+  });
+});
+
 describe('ContentBlock', () => {
   it('dispatches chart content to ContentChartBlock', () => {
     const html = renderToStaticMarkup(<ContentBlock content={chartContent} />);
     expect(html).toContain('content-block--chart');
   });
 
+  it('dispatches table content to ContentTableBlock', () => {
+    const html = renderToStaticMarkup(<ContentBlock content={tableContent} />);
+    expect(html).toContain('content-block--table');
+  });
+
   it('renders nothing for an unrecognized/not-yet-implemented kind', () => {
-    const html = renderToStaticMarkup(<ContentBlock content={{ kind: 'table' }} />);
+    const html = renderToStaticMarkup(<ContentBlock content={{ kind: 'widget' }} />);
     expect(html).toBe('');
   });
 });
