@@ -29,8 +29,15 @@ export default function ArgusView() {
     respondConfirm,
   } = useVoiceAssistant();
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
-  const { contentBlocks } = useVoiceContent();
+  const { contentBlocks, toggleEmbed } = useVoiceContent();
   const feedEntries = useMemo(() => buildChatFeed(transcriptHistory, contentBlocks), [transcriptHistory, contentBlocks]);
+
+  // B5: a table row (list_beamline_devices, tagged pv_prefix/widget_type
+  // server-side - see ContentTableBlock's embeddable check) embeds/
+  // un-embeds that device's live widget inline, purely client-side.
+  const handleRowClick = (row) => {
+    toggleEmbed(row.device_id, row.widget_type, row.pv_prefix, row.cells?.name || row.device_id);
+  };
 
   const connected = connectionStatus === 'connected';
 
@@ -73,7 +80,7 @@ export default function ArgusView() {
 
       <div className="argus-body">
         <div className="argus-transcript-panel">
-          <ChatFeed entries={feedEntries} partial={partialTranscript} client={pvwsClient} />
+          <ChatFeed entries={feedEntries} partial={partialTranscript} client={pvwsClient} onRowClick={handleRowClick} />
           {voiceConfig?.debug && (
             <DebugPhasePanel recentTurns={recentTurns} liveDurationMs={liveDurationMs} visualPhase={visualPhase} />
           )}

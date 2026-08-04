@@ -36,17 +36,30 @@ export function useVoiceContent() {
 
   const toggleEmbed = useCallback((deviceId, widgetType, pvPrefix, title) => {
     if (!deviceId || !widgetType || !pvPrefix) return;
-    setContentBlocks((prev) => [...prev, {
-      type: 'content',
-      kind: 'widget',
-      tool: 'local_click',
-      ts: Date.now(),
-      title: title || deviceId,
-      device_id: deviceId,
-      pv_prefix: pvPrefix,
-      widget_type: widgetType,
-      config: { pvPrefix, viewMode: 'essential' },
-    }]);
+    setContentBlocks((prev) => {
+      // True toggle: clicking the same device/widget_type again removes
+      // its locally-embedded block instead of stacking duplicates -
+      // `tool === 'local_click'` scopes this to blocks toggleEmbed itself
+      // added, never a server-sent widget from a real device lookup (B3).
+      const idx = prev.findIndex((b) =>
+        b.kind === 'widget' && b.tool === 'local_click'
+        && b.device_id === deviceId && b.widget_type === widgetType
+      );
+      if (idx !== -1) {
+        return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      }
+      return [...prev, {
+        type: 'content',
+        kind: 'widget',
+        tool: 'local_click',
+        ts: Date.now(),
+        title: title || deviceId,
+        device_id: deviceId,
+        pv_prefix: pvPrefix,
+        widget_type: widgetType,
+        config: { pvPrefix, viewMode: 'essential' },
+      }];
+    });
   }, []);
 
   return { contentBlocks, toggleEmbed };

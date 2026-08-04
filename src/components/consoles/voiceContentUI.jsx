@@ -37,12 +37,14 @@ export function ContentChartBlock({ content }) {
   );
 }
 
-/** Rows carrying a device_id (see argus_content.py's DEVGROUP_WIDGET_MAP /
- * "device_id" tagging) render clickable; onRowClick is only wired up by
- * call sites once B5 lands (click-to-embed) - passing nothing here just
- * means rows render as plain, non-interactive data, same as a row with no
- * device_id at all (e.g. list_iocs, or a devgroup this beamline's widget
- * registry doesn't cover). */
+/** Only rows carrying both pv_prefix AND widget_type (see argus_content.py's
+ * DEVGROUP_WIDGET_MAP - not every row that has a device_id resolves to an
+ * embeddable widget; a search_pvs row, for instance, only ever gets a bare
+ * device_id since a raw PV isn't a whole device) render clickable.
+ * onRowClick receives the whole row - call sites (B5) pull pv_prefix/
+ * widget_type/device_id/cells.name out of it to call useVoiceContent's
+ * toggleEmbed. Passing no onRowClick just means rows render as plain,
+ * non-interactive data. */
 export function ContentTableBlock({ content, onRowClick }) {
   const columns = content.columns || [];
   const rows = content.rows || [];
@@ -61,11 +63,12 @@ export function ContentTableBlock({ content, onRowClick }) {
           </thead>
           <tbody>
             {rows.map((row, i) => {
-              const clickable = Boolean(row.device_id && onRowClick);
+              const embeddable = Boolean(row.pv_prefix && row.widget_type);
+              const clickable = embeddable && Boolean(onRowClick);
               return (
                 <tr
                   key={i}
-                  className={row.device_id ? 'content-table-row--clickable' : undefined}
+                  className={embeddable ? 'content-table-row--clickable' : undefined}
                   onClick={clickable ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((col) => <td key={col}>{String(row.cells?.[col] ?? '')}</td>)}

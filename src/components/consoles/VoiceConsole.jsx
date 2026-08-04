@@ -32,9 +32,16 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
     respondConfirm,
   } = useVoiceAssistant();
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
-  const { contentBlocks } = useVoiceContent();
+  const { contentBlocks, toggleEmbed } = useVoiceContent();
   const feedEntries = useMemo(() => buildChatFeed(transcriptHistory, contentBlocks), [transcriptHistory, contentBlocks]);
   const { panelRef, onHeaderMouseDown } = useDraggable(detached);
+
+  // B5: a table row (list_beamline_devices, tagged pv_prefix/widget_type
+  // server-side - see ContentTableBlock's embeddable check) embeds/
+  // un-embeds that device's live widget inline, purely client-side.
+  const handleRowClick = (row) => {
+    toggleEmbed(row.device_id, row.widget_type, row.pv_prefix, row.cells?.name || row.device_id);
+  };
 
   // Safety net: releasing the mouse outside the FAB must still stop the mic.
   useEffect(() => {
@@ -77,7 +84,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
       )}
 
       <div className="console-body voice-console-body">
-        <ChatFeed entries={feedEntries} partial={partialTranscript} client={pvwsClient} />
+        <ChatFeed entries={feedEntries} partial={partialTranscript} client={pvwsClient} onRowClick={handleRowClick} />
       </div>
 
       {voiceConfig?.debug && (

@@ -33,6 +33,16 @@ const tableContent = {
   ts: 1000,
 };
 
+// Shaped like a search_pvs row (argus_content.py's _build_search_pvs_table):
+// device_id only, no pv_prefix/widget_type - a raw PV isn't a whole device.
+const pvOnlyTableContent = {
+  ...tableContent,
+  columns: ['name', 'devgroup', 'ioc'],
+  rows: [
+    { cells: { name: 'SPARC:MAG:HZ:GUNSOL01:ALL_FAULT', devgroup: 'mag', ioc: 'haz-ser-ch1' }, device_id: 'SPARC:MAG:HZ:GUNSOL01:ALL_FAULT' },
+  ],
+};
+
 describe('ContentChartBlock', () => {
   it('renders the title, unit, and a MiniChart canvas', () => {
     const html = renderToStaticMarkup(<ContentChartBlock content={chartContent} />);
@@ -70,14 +80,20 @@ describe('ContentTableBlock', () => {
     expect(html).toContain('5');
   });
 
-  it('marks rows with a device_id as clickable, others not', () => {
+  it('marks rows with pv_prefix+widget_type as clickable, others not', () => {
     const html = renderToStaticMarkup(<ContentTableBlock content={tableContent} onRowClick={() => {}} />);
     expect(html).toContain('content-table-row--clickable');
   });
 
-  it('does not mark rows clickable when no onRowClick handler is given', () => {
+  it('does not mark a device_id-only row (e.g. a raw search_pvs PV) as clickable', () => {
+    const html = renderToStaticMarkup(<ContentTableBlock content={pvOnlyTableContent} onRowClick={() => {}} />);
+    expect(html).not.toContain('content-table-row--clickable');
+  });
+
+  it('still shows the clickable affordance even with no onRowClick handler given', () => {
     const html = renderToStaticMarkup(<ContentTableBlock content={tableContent} />);
-    // device_id rows still get the class (visual affordance), but no onClick fires without a handler
+    // embeddable rows keep the visual affordance class regardless, but no
+    // onClick fires without a handler (can't assert that via static HTML).
     expect(html).toContain('content-table-row--clickable');
   });
 
