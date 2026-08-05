@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, forwardRef, cloneElement, Children } fr
 import { createPortal } from 'react-dom';
 import { getWidgetType } from './registry.js';
 import { usePv } from '../hooks/usePv.js';
+import { usePopoutWindow } from '../hooks/usePopoutWindow.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useVoiceHighlight } from '../context/VoiceHighlightContext.jsx';
 import CreateTicketModal from '../components/common/CreateTicketModal.jsx';
@@ -33,6 +34,7 @@ const WidgetFrame = forwardRef(function WidgetFrame(
   const subtitle = widget.config?.subtitle || '';
   const icon = typeDef?.icon || '🔧';
   const frameless = !!widget.config?.frameless && !editMode;
+  const { popout, isOpen: isPoppedOut, open: openPopout } = usePopoutWindow(`${icon} ${title}`);
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -165,6 +167,13 @@ const WidgetFrame = forwardRef(function WidgetFrame(
             >
               ⤢
             </button>
+            <button
+              className={`widget-btn ${isPoppedOut ? 'widget-btn--active' : ''}`}
+              onClick={openPopout}
+              title="Apri in una nuova finestra"
+            >
+              ↗
+            </button>
             {hasViewMode ? (
               <button
                 className={`widget-btn ${currentMode === 'detail' ? 'widget-btn--active' : ''}`}
@@ -221,6 +230,19 @@ const WidgetFrame = forwardRef(function WidgetFrame(
         </div>,
         document.body,
       )}
+      {/* Pop-out window — portaled to a container living in a REAL separate
+          OS window (window.open(), see usePopoutWindow.js), not just
+          document.body of this document like the other portals here.
+          React's own portal-unmount path handles cleanup when `popout`
+          goes back to null - nothing extra needed here. */}
+      {popout && createPortal(
+        Children.map(children, (child) =>
+          child && typeof child === 'object'
+            ? cloneElement(child, { config: effectiveConfig, client })
+            : child
+        ),
+        popout.container,
+      )}
       {/* Context Menu — portaled to body */}
       {contextMenu && createPortal(
         <div className="widget-context-backdrop" onClick={closeContextMenu}>
@@ -232,6 +254,10 @@ const WidgetFrame = forwardRef(function WidgetFrame(
             <button className="bll-context-menu-item" onClick={() => { setShowDetail(true); closeContextMenu(); }}>
               <span className="bll-context-menu-icon">⤢</span>
               <span className="bll-context-menu-label">Detail View</span>
+            </button>
+            <button className="bll-context-menu-item" onClick={() => { openPopout(); closeContextMenu(); }}>
+              <span className="bll-context-menu-icon">↗</span>
+              <span className="bll-context-menu-label">Apri in nuova finestra</span>
             </button>
             {isAuthenticated && (
               <>
