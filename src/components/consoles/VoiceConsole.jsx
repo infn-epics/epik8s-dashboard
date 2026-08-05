@@ -1,13 +1,20 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDraggable } from '../../hooks/useDraggable.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { useVoice } from '../../context/VoiceContext.jsx';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant.js';
 import { useVoicePhase } from '../../hooks/useVoicePhase.js';
 import { useVoiceContent } from '../../hooks/useVoiceContent.js';
+import { useWakeWord } from '../../hooks/useWakeWord.js';
 import { buildChatFeed } from '../../voice/events.js';
 import { VoiceOrb, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
 import { ChatFeed } from './voiceContentUI.jsx';
+
+// Shared with ArgusView.jsx by design - a preference toggled on one voice
+// surface should reflect on the other too, same spirit as this repo's
+// other localStorage-persisted overrides (see AppContext.jsx's
+// epik8s-voice-overrides).
+const HANDS_FREE_LS_KEY = 'epik8s-voice-handsfree';
 
 /**
  * VoiceConsole — floating/dockable panel for the experimental voice
@@ -35,6 +42,18 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
   const { contentBlocks, toggleEmbed } = useVoiceContent();
   const feedEntries = useMemo(() => buildChatFeed(transcriptHistory, contentBlocks), [transcriptHistory, contentBlocks]);
   const { panelRef, onHeaderMouseDown } = useDraggable(detached);
+  const connected = connectionStatus === 'connected';
+
+  const [handsFreeOn, setHandsFreeOn] = useState(() => localStorage.getItem(HANDS_FREE_LS_KEY) === '1');
+  useEffect(() => {
+    localStorage.setItem(HANDS_FREE_LS_KEY, handsFreeOn ? '1' : '0');
+  }, [handsFreeOn]);
+  const { armed } = useWakeWord({
+    enabled: handsFreeOn && connected,
+    config: voiceConfig?.wakeWord,
+    onWake: startTalk,
+    onSilence: stopTalk,
+  });
 
   // B5: a table row (list_beamline_devices, tagged pv_prefix/widget_type
   // server-side - see ContentTableBlock's embeddable check) embeds/
@@ -55,8 +74,6 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
     };
   }, [stopTalk]);
 
-  const connected = connectionStatus === 'connected';
-
   return (
     <div ref={panelRef} className={`console-panel voice-console ${detached ? 'console-detached' : ''}`}>
       <div className="console-header" onMouseDown={onHeaderMouseDown}>
@@ -67,6 +84,15 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
         <div className="console-actions">
           {connectionStatus === 'error' && (
             <button className="console-btn" onClick={connect} title="Riconnetti">↻</button>
+          )}
+          {voiceConfig?.wakeWord?.accessKey && (
+            <button
+              className={`console-btn ${handsFreeOn ? 'console-btn--on' : ''}`}
+              onClick={() => setHandsFreeOn((v) => !v)}
+              title="Ascolto continuo (wake word)"
+            >
+              🎧
+            </button>
           )}
           {!detached && (
             <button className="console-btn" onClick={onDetach} title="Pop out">⧉</button>
@@ -96,6 +122,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
         <VoiceOrb
           visualPhase={visualPhase}
           connected={connected}
+          armed={armed}
           onPressStart={startTalk}
           onPressEnd={stopTalk}
         />

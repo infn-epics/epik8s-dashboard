@@ -83,13 +83,23 @@ export function visualPhaseToLabel(visualPhase) {
  * Press-and-hold mic control, same prop contract/event wiring as
  * VoiceFabButton plus a visualPhase prop for the finer-grained animation -
  * a drop-in replacement at call sites, see useVoicePhase.js.
+ *
+ * `armed` (hands-free wake-word mode, see src/hooks/useWakeWord.js) is
+ * orthogonal to visualPhase - it only changes anything while idle (once a
+ * turn starts, whether triggered by press-and-hold or the wake word,
+ * visualPhase's own stt/llm/tts states take over identically either way)
+ * - so it's handled here as a presentational override rather than a new
+ * visualPhase value.
  */
-export function VoiceOrb({ visualPhase, connected, disabled, onPressStart, onPressEnd }) {
+export function VoiceOrb({ visualPhase, connected, disabled, armed, onPressStart, onPressEnd }) {
+  const showArmed = armed && visualPhase === 'idle';
+  const icon = showArmed ? '🎧' : visualPhaseToIcon(visualPhase);
+  const label = showArmed ? 'In ascolto (wake word)' : visualPhaseToLabel(visualPhase);
   return (
     <button
-      className={`voice-orb voice-orb--${visualPhase} ${!connected ? 'voice-orb--offline' : ''}`}
+      className={`voice-orb voice-orb--${visualPhase} ${showArmed ? 'voice-orb--armed' : ''} ${!connected ? 'voice-orb--offline' : ''}`}
       disabled={disabled || !connected}
-      title={connected ? visualPhaseToLabel(visualPhase) : 'Voice assistant disconnesso'}
+      title={connected ? label : 'Voice assistant disconnesso'}
       onMouseDown={onPressStart}
       onMouseUp={onPressEnd}
       onMouseLeave={onPressEnd}
@@ -97,7 +107,7 @@ export function VoiceOrb({ visualPhase, connected, disabled, onPressStart, onPre
       onTouchEnd={onPressEnd}
     >
       <span className="voice-orb-ring" />
-      <span className="voice-orb-icon">{visualPhaseToIcon(visualPhase)}</span>
+      <span className="voice-orb-icon">{icon}</span>
     </button>
   );
 }

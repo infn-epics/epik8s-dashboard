@@ -75,6 +75,30 @@ describe('VoiceOrb', () => {
     );
     expect(html).toContain('disabled');
   });
+
+  it('shows the wake-word armed indicator only while idle', () => {
+    const idleArmed = renderToStaticMarkup(
+      <VoiceOrb visualPhase="idle" connected armed onPressStart={() => {}} onPressEnd={() => {}} />
+    );
+    expect(idleArmed).toContain('voice-orb--armed');
+    expect(idleArmed).toContain('🎧');
+
+    // Once a turn actually starts (any non-idle phase), the normal
+    // phase icon/label takes over even if armed is still true - armed
+    // only matters while nothing else is happening.
+    const sttArmed = renderToStaticMarkup(
+      <VoiceOrb visualPhase="stt" connected armed onPressStart={() => {}} onPressEnd={() => {}} />
+    );
+    expect(sttArmed).not.toContain('voice-orb--armed');
+    expect(sttArmed).toContain(visualPhaseToIcon('stt'));
+  });
+
+  it('does not show the armed indicator when not armed', () => {
+    const html = renderToStaticMarkup(
+      <VoiceOrb visualPhase="idle" connected armed={false} onPressStart={() => {}} onPressEnd={() => {}} />
+    );
+    expect(html).not.toContain('voice-orb--armed');
+  });
 });
 
 describe('DebugPhasePanel', () => {

@@ -14,12 +14,14 @@ actions — they only forward a confirm/cancel event to the agent.
 ## Files
 
 - `src/voice/events.js` — event schemas, `matchDeviceId`, backoff/TTL pure helpers, phase-timing reducers (framework-free, unit-tested in `tests/voiceEvents.test.js`, `tests/voiceHighlight.test.js`, `tests/voicePhaseReducer.test.js`).
+- `src/voice/wakeWord.js` — pure state machine (`disabled`/`armed`/`active`) for hands-free wake-word mode, framework-free, unit-tested in `tests/wakeWordReducer.test.js`.
 - `src/services/voiceRoom.js` — `VoiceRoomClient`, the LiveKit room connection (mirrors `PvwsClient`'s shape).
 - `src/context/VoiceContext.jsx` — owns the `VoiceRoomClient` instance, exposes connection status.
 - `src/context/VoiceHighlightContext.jsx` — tracks `highlight` events, exposes `isHighlighted(pvPrefix, deviceId)` to widgets.
 - `src/context/VoicePhaseContext.jsx` — tracks `phase` events (STT/LLM/TTS start/end per turn), exposes `{ turns, currentTurn }` for the Jarvis-like animation and debug latency panel.
 - `src/hooks/useVoiceAssistant.js` — push-to-talk state machine, transcript, confirmation flow.
 - `src/hooks/useVoicePhase.js` — derives a finer-grained `visualPhase` (idle/listening/stt/llm/tts/error) plus per-turn latency numbers from `useVoiceAssistant()`'s state and `VoicePhaseContext`.
+- `src/hooks/useWakeWord.js` — hands-free wake-word mode: Porcupine (wake detection) + Cobra (VAD, end-of-utterance), driving `useVoiceAssistant()`'s `startTalk`/`stopTalk` exactly as press-and-hold does. See "Hands-free wake-word mode" below.
 - `src/components/consoles/VoiceConsole.jsx` + `voiceConsoleUI.jsx` — the floating console (animated orb, transcript panel, confirmation banner, debug latency panel).
 
 ## Enabling the flag
@@ -37,6 +39,10 @@ epicsConfiguration:
       roomName: "argus-control-room"
       identityPrefix: "operator"
       # highlightTtlMs: 8000   # optional, defaults to 8000ms in code
+      # wakeWord:              # optional - omit entirely to leave hands-free mode unavailable
+      #   accessKey: "..."               # Picovoice AccessKey (see below - client-side-safe by design)
+      #   keywordUrl: "https://.../argus_it.ppn"
+      #   modelUrl: "https://.../porcupine_params_it.pv"
 ```
 
 For local dev, without editing `values.yaml`, use query params (persisted
@@ -52,8 +58,9 @@ http://localhost:5173/dashboard?voice=1&voiceToken=http://localhost:8788/token&v
 - `?voiceServer=<ws url>` — override the LiveKit media server WS URL.
 - `?voiceRoom=<name>` — override the room name.
 - `?voiceDebug=1` / `?voiceDebug=0` — force the debug latency panel on/off (also settable permanently for a beamline via `voiceAssistant.debug: true` in `values.yaml`).
+- `?porcupineKey=<key>` — override the wake-word AccessKey (see "Hands-free wake-word mode" below).
 
-All five persist to `localStorage` (`epik8s-voice-overrides`) so you only
+All six persist to `localStorage` (`epik8s-voice-overrides`) so you only
 need to pass them once.
 
 ## Testing against a local LiveKit backend
@@ -118,6 +125,60 @@ choice. Real execution and audit logging stay entirely backend/MCP-side.
 { "type": "phase", "turn_id": "3f9a1c2e...", "phase": "stt", "edge": "start", "ts": 1690454400000 }
 ```
 `phase` is one of `stt`/`llm`/`tts`, `edge` is `start`/`end`. **`llm` may fire more than one start/end pair for a single `turn_id`** when the model performs a tool call mid-turn — this is expected, not a bug (confirmed live against the deployed livekit-agents version). `reducePhaseEvent`/`computeTurnDurations` in `events.js` handle this: `start` is idempotent-first (a repeated start doesn't reset the clock), `end` is idempotent-last (duration spans first-start to the final end, covering the whole tool-call detour).
+
+## Hands-free wake-word mode
+
+An opt-in alternative to press-and-hold: an operator toggles "ascolto
+continuo" (the 🎧 button next to the console header / Argus page header,
+only shown when `wakeWord.accessKey` is configured), and the app listens
+locally for the wake word "Argus" — no button press needed once armed.
+
+**Architecture, in one sentence**: wake-word detection runs entirely
+client-side (Porcupine + Cobra VAD via `@picovoice/web-voice-processor`,
+`src/hooks/useWakeWord.js`) and never publishes to LiveKit while idle —
+only the moment the wake word fires does it call the exact same
+`startTalk()`/`stopTalk()` that press-and-hold already uses, so from the
+backend's perspective (and `src/services/voiceRoom.js`'s) this is
+indistinguishable from a real press-and-hold turn. This is a deliberate
+constraint, not just a design preference: this beamline's LiveKit RTC
+media path currently supports only one concurrent published audio
+session (a single UDP port on the `livekit-rtc` Service — see
+`epik8s-platform`'s `values.yaml` `aiPlatform.livekit.rtc.portRangeEnd`
+comment), so continuous *published* listening from every idle browser
+tab in a control room would be a real problem, not a hypothetical one.
+
+**Why it's opt-in, not default**: push-to-talk remains the primary
+interaction. Continuous listening in a shared control room risks
+transcribing background chatter/radio traffic as if it were a real
+query - the wake word mitigates this but doesn't eliminate it, so an
+explicit per-operator toggle (persisted to `localStorage` under
+`epik8s-voice-handsfree`, shared between `VoiceConsole.jsx` and
+`ArgusView.jsx`) is the safer default.
+
+### External prerequisite (not something `npm install` can provide)
+
+Hands-free mode needs a Picovoice AccessKey and a trained wake-word model
+- these are **not bundled** with the app (the `.ppn`/`.pv` files are
+fetched by URL at runtime, matching this app's whole config model - see
+`AppContext.jsx`'s `buildVoiceConfig()`):
+
+1. Create a free account at [Picovoice Console](https://console.picovoice.ai/) and get an AccessKey. It's designed to be used client-side (rate-limited per free tier) - not a secret to hide server-side, but still resolved at runtime from `values.yaml`/`?porcupineKey=`, never baked into the build (see the comment above `buildVoiceConfig()` for why - this app ships one Docker image across every beamline).
+2. Use the Console's wake-word training tool to create a custom **"Argus"** keyword for the **Web** platform, **Italian** language pack (confirm Italian is offered - all operator interaction is in Italian). This produces a `.ppn` keyword file and needs the matching `porcupine_params_it.pv` model file.
+3. Host both files somewhere reachable by URL (same git-values repo as other beamline static assets, or any CDN path) and set `wakeWord.keywordUrl`/`wakeWord.modelUrl` in that beamline's `values.yaml`.
+
+Without these three fields configured, the 🎧 toggle simply doesn't
+appear - push-to-talk is completely unaffected either way.
+
+### Testing hands-free mode locally
+
+With the AccessKey/URLs configured (via `values.yaml` or
+`?porcupineKey=` for local dev against already-hosted `.ppn`/`.pv`
+files):
+
+1. Load the dashboard, connect (green dot), click 🎧 to arm hands-free mode - the orb should get a subtle pulsing accent-colored ring (`voice-orb--armed`).
+2. Say "Argus" - the orb should switch to the normal `listening`/`stt` animation exactly as if you'd pressed it, with no button press involved.
+3. Speak your command, then pause naturally - the mic should stop publishing on its own a short beat after you stop talking (not instantly, not only after the 15s hard safety timeout - see `src/voice/wakeWord.js`'s module docstring for the silence-timer/max-duration design).
+4. Toggle 🎧 off and confirm press-and-hold still works completely unaffected.
 
 ## Known open questions
 

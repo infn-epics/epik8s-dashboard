@@ -14,6 +14,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@picovoice/cobra-web": "^3.0.1",
+    "@picovoice/porcupine-web": "^4.0.1",
+    "@picovoice/web-voice-processor": "^4.0.10",
     "@xyflow/react": "^12.10.1",
     "html2canvas": "^1.4.1",
     "js-yaml": "^4.1.0",

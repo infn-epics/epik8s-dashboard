@@ -1,12 +1,16 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useVoice } from '../../context/VoiceContext.jsx';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant.js';
 import { useVoicePhase } from '../../hooks/useVoicePhase.js';
 import { useVoiceContent } from '../../hooks/useVoiceContent.js';
+import { useWakeWord } from '../../hooks/useWakeWord.js';
 import { buildChatFeed } from '../../voice/events.js';
 import { VoiceOrb, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
 import { ChatFeed } from '../consoles/voiceContentUI.jsx';
+
+// Shared with VoiceConsole.jsx by design - see that file's comment.
+const HANDS_FREE_LS_KEY = 'epik8s-voice-handsfree';
 
 /**
  * ArgusView — full-page voice interaction with ARGUS, the accelerator
@@ -31,6 +35,18 @@ export default function ArgusView() {
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
   const { contentBlocks, toggleEmbed } = useVoiceContent();
   const feedEntries = useMemo(() => buildChatFeed(transcriptHistory, contentBlocks), [transcriptHistory, contentBlocks]);
+  const connected = connectionStatus === 'connected';
+
+  const [handsFreeOn, setHandsFreeOn] = useState(() => localStorage.getItem(HANDS_FREE_LS_KEY) === '1');
+  useEffect(() => {
+    localStorage.setItem(HANDS_FREE_LS_KEY, handsFreeOn ? '1' : '0');
+  }, [handsFreeOn]);
+  const { armed } = useWakeWord({
+    enabled: handsFreeOn && connected,
+    config: voiceConfig?.wakeWord,
+    onWake: startTalk,
+    onSilence: stopTalk,
+  });
 
   // B5: a table row (list_beamline_devices, tagged pv_prefix/widget_type
   // server-side - see ContentTableBlock's embeddable check) embeds/
@@ -38,8 +54,6 @@ export default function ArgusView() {
   const handleRowClick = (row) => {
     toggleEmbed(row.device_id, row.widget_type, row.pv_prefix, row.cells?.name || row.device_id);
   };
-
-  const connected = connectionStatus === 'connected';
 
   if (!voiceConfig?.enabled) {
     return (
@@ -68,6 +82,15 @@ export default function ArgusView() {
         {connectionStatus === 'error' && (
           <button className="argus-reconnect-btn" onClick={connect}>↻ Riconnetti</button>
         )}
+        {voiceConfig?.wakeWord?.accessKey && (
+          <button
+            className={`console-btn ${handsFreeOn ? 'console-btn--on' : ''}`}
+            onClick={() => setHandsFreeOn((v) => !v)}
+            title="Ascolto continuo (wake word)"
+          >
+            🎧
+          </button>
+        )}
       </div>
 
       {pendingConfirm && (
@@ -90,11 +113,14 @@ export default function ArgusView() {
           <VoiceOrb
             visualPhase={visualPhase}
             connected={connected}
+            armed={armed}
             onPressStart={startTalk}
             onPressEnd={stopTalk}
           />
           <span className="argus-state-label">{visualPhaseToLabel(visualPhase)}</span>
-          <span className="argus-mic-hint">Tieni premuto per parlare</span>
+          <span className="argus-mic-hint">
+            {armed ? 'Di’ "Argus" per parlare' : 'Tieni premuto per parlare'}
+          </span>
         </div>
       </div>
     </div>

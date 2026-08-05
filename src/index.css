@@ -490,6 +490,20 @@ body,
   color: var(--text);
 }
 
+/* Toggled-on state for the hands-free "ascolto continuo" wake-word
+   button (VoiceConsole.jsx / ArgusView.jsx) - reused generically for any
+   .console-btn that represents an on/off toggle rather than a one-shot
+   action. */
+.console-btn--on {
+  background: var(--accent);
+  color: #fff;
+}
+
+.console-btn--on:hover {
+  background: var(--accent-hover);
+  color: #fff;
+}
+
 .console-filter {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -930,6 +944,20 @@ body,
   border-color: var(--text-dim);
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Hands-free wake-word mode (src/hooks/useWakeWord.js): idle but actively
+   listening locally for the wake word - deliberately subtler than
+   --listening's fast red pulse (that means "an actual turn is live"),
+   just enough to show the mic isn't fully passive. */
+.voice-orb--armed {
+  border-color: var(--accent);
+  animation: voice-orb-armed-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes voice-orb-armed-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 143, 247, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(79, 143, 247, 0); }
 }
 
 @keyframes voice-orb-shimmer {

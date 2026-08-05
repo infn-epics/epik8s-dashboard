@@ -50,6 +50,18 @@ function saveVoiceOverrides(overrides) {
  * the ?pvws=/?archiver= override pattern used for dataSources above, for
  * local dev testing against a LiveKit backend without editing values.yaml.
  * Disabled by default (ENABLE_VOICE_ASSISTANT-equivalent feature flag).
+ *
+ * wakeWord.* (hands-free mode, src/hooks/useWakeWord.js) follows the exact
+ * same runtime-resolved pattern deliberately, NOT a Vite build-time env
+ * var: this app ships one Docker image across every beamline via Helm,
+ * each fetching its own values.yaml at runtime, so a build-time
+ * VITE_PORCUPINE_ACCESS_KEY would either bake in one shared key for every
+ * deployment or require a rebuild per beamline - wrong for this app's
+ * whole config model. accessKey is Picovoice's own client-side-safe,
+ * rate-limited-per-free-tier key (not a secret to hide server-side); the
+ * .ppn/.pv model assets are fetched by keywordUrl/modelUrl at runtime
+ * rather than bundled, so beamlines that never enable this don't ship the
+ * binary assets in the shared image.
  */
 function buildVoiceConfig(config, params) {
   const va = config?.epicsConfiguration?.services?.voiceAssistant || {};
@@ -58,6 +70,7 @@ function buildVoiceConfig(config, params) {
   const voiceServerParam = params.get('voiceServer');
   const voiceRoomParam = params.get('voiceRoom');
   const voiceDebugParam = params.get('voiceDebug');
+  const porcupineKeyParam = params.get('porcupineKey');
 
   const overrides = loadVoiceOverrides();
   if (voiceParam === '1' || voiceParam === 'true') overrides.enabled = true;
@@ -67,7 +80,8 @@ function buildVoiceConfig(config, params) {
   if (voiceRoomParam) overrides.roomName = voiceRoomParam;
   if (voiceDebugParam === '1' || voiceDebugParam === 'true') overrides.debug = true;
   else if (voiceDebugParam === '0' || voiceDebugParam === 'false') overrides.debug = false;
-  if (voiceParam !== null || voiceTokenParam || voiceServerParam || voiceRoomParam || voiceDebugParam !== null) {
+  if (porcupineKeyParam) overrides.wakeWordAccessKey = porcupineKeyParam;
+  if (voiceParam !== null || voiceTokenParam || voiceServerParam || voiceRoomParam || voiceDebugParam !== null || porcupineKeyParam) {
     saveVoiceOverrides(overrides);
   }
 
@@ -82,6 +96,11 @@ function buildVoiceConfig(config, params) {
     // lets a beamline ship with the latency debug panel always-on for ops
     // staff without needing the query param every session.
     debug: overrides.debug ?? (va.debug === true),
+    wakeWord: {
+      accessKey: overrides.wakeWordAccessKey || va.wakeWord?.accessKey || '',
+      keywordUrl: va.wakeWord?.keywordUrl || '',
+      modelUrl: va.wakeWord?.modelUrl || '',
+    },
   };
 }
 
