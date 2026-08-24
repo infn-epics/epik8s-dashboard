@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVoice } from '../context/VoiceContext.jsx';
 import {
   EVENT_TYPES,
   isTranscriptEvent,
   isConfirmRequestEvent,
+  isPhaseEvent,
 } from '../voice/events.js';
+
+// A lost data-channel completion event must not leave the control stuck in
+// "Risposta…" forever. Normal turns finish on tts:end much sooner; this is
+// only a bounded last-resort recovery for a dropped event or broken agent.
+export const VOICE_COMPLETION_TIMEOUT_MS = 120000;
 
 /**
  * useVoiceAssistant — single-consumer hook (VoiceConsole.jsx) layering the
@@ -24,6 +30,24 @@ export function useVoiceAssistant() {
   const [partialTranscript, setPartialTranscript] = useState(null); // { role, text }
   const [transcriptHistory, setTranscriptHistory] = useState([]); // [{ role, text, ts }]
   const [pendingConfirm, setPendingConfirm] = useState(null); // confirm_request payload
+  const completionTimerRef = useRef(null);
+
+  const clearCompletionTimer = useCallback(() => {
+    if (completionTimerRef.current !== null) {
+      clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = null;
+    }
+  }, []);
+
+  const armCompletionTimer = useCallback(() => {
+    clearCompletionTimer();
+    completionTimerRef.current = setTimeout(() => {
+      completionTimerRef.current = null;
+      setState((current) => (
+        current === 'thinking' || current === 'speaking' ? 'idle' : current
+      ));
+    }, VOICE_COMPLETION_TIMEOUT_MS);
+  }, [clearCompletionTimer]);
 
   useEffect(() => {
     if (connectionStatus === 'error') setState('error');
@@ -44,26 +68,52 @@ export function useVoiceAssistant() {
           // - it was previously silently dropped here, unused until now.
           setTranscriptHistory((prev) => [...prev, { role: msg.role, text: msg.text, ts: msg.ts }]);
         }
-        if (msg.role === 'assistant') setState(msg.final ? 'idle' : 'speaking');
+        if (msg.role === 'assistant') {
+          if (msg.final) {
+            clearCompletionTimer();
+            setState('idle');
+          } else {
+            armCompletionTimer();
+            setState('speaking');
+          }
+        }
+        return;
+      }
+      if (isPhaseEvent(msg)) {
+        if (msg.phase === 'tts' && msg.edge === 'start') {
+          armCompletionTimer();
+        } else if (msg.phase === 'tts' && msg.edge === 'end') {
+          // TTS completion is authoritative for the visual state and is
+          // independent of the optional transcript mirror event.
+          clearCompletionTimer();
+          setState((current) => (
+            current === 'thinking' || current === 'speaking' ? 'idle' : current
+          ));
+        }
         return;
       }
       if (isConfirmRequestEvent(msg)) {
         setPendingConfirm(msg);
       }
     });
-    return unsub;
-  }, [client]);
+    return () => {
+      unsub();
+      clearCompletionTimer();
+    };
+  }, [client, armCompletionTimer, clearCompletionTimer]);
 
   const startTalk = useCallback(async () => {
     if (connectionStatus !== 'connected') return;
+    clearCompletionTimer();
     setState('listening');
     await client.startTalking();
-  }, [client, connectionStatus]);
+  }, [client, connectionStatus, clearCompletionTimer]);
 
   const stopTalk = useCallback(async () => {
     await client.stopTalking();
+    armCompletionTimer();
     setState((s) => (s === 'listening' ? 'thinking' : s));
-  }, [client]);
+  }, [client, armCompletionTimer]);
 
   const respondConfirm = useCallback((actionId, confirmed) => {
     client.sendData({
