@@ -21,7 +21,7 @@ import {
 } from '../services/softiocApi.js';
 import { useGitFetch } from '../hooks/useGitFetch.js';
 import { useAuth } from './AuthContext.jsx';
-import { parseGitUrl, fetchFileFromGit } from '../services/gitApi.js';
+import { parseGitUrl, fetchFileFromGit, gitFileExists } from '../services/gitApi.js';
 
 const SoftIOCContext = createContext(null);
 
@@ -111,6 +111,23 @@ export function SoftIOCProvider({ children }) {
     if (!canSync) return;
     setSyncStatus({ state: 'syncing', lastSync: null, error: null });
     try {
+      const exists = await gitFileExists(repoInfo, SOFTIOC_VALUES_PATH, gitBranch, token || null);
+      if (!exists) {
+        // values-softiocs.yaml is optional. Avoid requesting a known-missing
+        // file, which browsers report as a noisy 404 even when caught here.
+        const emptyData = { defaults: {}, softiocs: [] };
+        setValuesData(emptyData);
+        setValuesYaml('');
+        setValuesLoaded(true);
+        setTaskConfigs({});
+        setDirty(false);
+        localStorage.removeItem(LS_VALUES_KEY);
+        localStorage.removeItem(LS_CONFIGS_KEY);
+        const now = new Date();
+        setSyncStatus({ state: 'ok', lastSync: now, error: null });
+        localStorage.setItem('epik8s-softioc-last-sync', now.toISOString());
+        return;
+      }
       const content = await fetchFromGit(SOFTIOC_VALUES_PATH);
       const data = parseValuesSoftiocs(content);
       setValuesData(data);
@@ -148,7 +165,7 @@ export function SoftIOCProvider({ children }) {
         setSyncStatus({ state: 'error', lastSync: null, error: err.message });
       }
     }
-  }, [canSync, fetchFromGit, syncConfigs]);
+  }, [canSync, fetchFromGit, gitBranch, repoInfo, syncConfigs, token]);
 
   // Auto-sync on mount — always sync when canSync so that stale/placeholder
   // data from a previous session is refreshed (and cleared if file is gone).

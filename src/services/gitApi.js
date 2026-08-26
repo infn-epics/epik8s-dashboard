@@ -103,6 +103,44 @@ export async function getFile(repoInfo, filePath, branch, token) {
 }
 
 /**
+ * Check whether a repository file exists without requesting that file.
+ *
+ * This is useful for optional files: browsers log a failed file request as a
+ * network error even when the caller handles the 404. Listing the existing
+ * parent directory avoids that noisy request while preserving authentication
+ * for private repositories.
+ */
+export async function gitFileExists(repoInfo, filePath, branch = 'main', token = null) {
+  if (!repoInfo) throw new Error('No repository configured');
+
+  const slash = filePath.lastIndexOf('/');
+  const dirPath = slash >= 0 ? filePath.slice(0, slash) : '';
+  const fileName = slash >= 0 ? filePath.slice(slash + 1) : filePath;
+  const headers = {};
+
+  let url;
+  if (repoInfo.platform === 'github') {
+    url = `https://api.github.com/repos/${repoInfo.projectPath}/contents/${dirPath}?ref=${encodeURIComponent(branch)}`;
+    headers.Accept = 'application/vnd.github.v3+json';
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } else {
+    const projectId = encodeURIComponent(repoInfo.projectPath);
+    url = `https://${repoInfo.host}/api/v4/projects/${projectId}/repository/tree?path=${encodeURIComponent(dirPath)}&ref=${encodeURIComponent(branch)}&per_page=100`;
+    if (token) headers['PRIVATE-TOKEN'] = token;
+  }
+
+  const resp = await fetch(proxyUrl(url), { headers });
+  if (resp.status === 404) return false;
+  if (!resp.ok) throw new Error(`Git repository listing failed (${resp.status})`);
+  const entries = await resp.json();
+  if (!Array.isArray(entries)) return false;
+  return entries.some((entry) => (
+    (entry.name === fileName || entry.path === filePath)
+    && (entry.type === 'file' || entry.type === 'blob')
+  ));
+}
+
+/**
  * Commit a file (create or update) to the repository.
  * Returns the commit info from the API.
  */
