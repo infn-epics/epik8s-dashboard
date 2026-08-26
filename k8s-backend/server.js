@@ -261,6 +261,11 @@ app.get('/api/v1/git-proxy', async (req, res, next) => {
 // ─── Health ─────────────────────────────────────────────────────────────
 
 app.get('/healthz', (_req, res) => {
+  // The dashboard probes this endpoint with a cross-origin, no-cors request
+  // to distinguish reachable services from rejected TLS certificates. Helmet
+  // defaults CORP to same-origin, which makes Chrome block that otherwise
+  // successful probe. Limit the relaxed policy to this non-sensitive route.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.json({ status: 'ok', namespace: NAMESPACE, timestamp: new Date().toISOString() });
 });
 
