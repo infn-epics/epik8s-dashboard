@@ -11,6 +11,10 @@ import {
 // "Risposta…" forever. Normal turns finish on tts:end much sooner; this is
 // only a bounded last-resort recovery for a dropped event or broken agent.
 export const VOICE_COMPLETION_TIMEOUT_MS = 120000;
+// STT normally completes in a few seconds. Silence, a failed/empty capture,
+// or a lost STT event must not leave the UI showing "Trascrizione…" for the
+// full whole-turn timeout.
+export const VOICE_STT_TIMEOUT_MS = 15000;
 
 /**
  * useVoiceAssistant — single-consumer hook (VoiceConsole.jsx) layering the
@@ -31,6 +35,11 @@ export function useVoiceAssistant() {
   const [transcriptHistory, setTranscriptHistory] = useState([]); // [{ role, text, ts }]
   const [pendingConfirm, setPendingConfirm] = useState(null); // confirm_request payload
   const completionTimerRef = useRef(null);
+  // Pointer-up is delivered both by the button and the window safety-net.
+  // Treat press/release as one transaction so duplicate release events cannot
+  // race each other and cancel/re-arm the wrong turn.
+  const talkActiveRef = useRef(false);
+  const releaseInFlightRef = useRef(false);
 
   const clearCompletionTimer = useCallback(() => {
     if (completionTimerRef.current !== null) {
@@ -39,21 +48,33 @@ export function useVoiceAssistant() {
     }
   }, []);
 
-  const armCompletionTimer = useCallback(() => {
+  const armCompletionTimer = useCallback((timeoutMs = VOICE_COMPLETION_TIMEOUT_MS) => {
     clearCompletionTimer();
     completionTimerRef.current = setTimeout(() => {
       completionTimerRef.current = null;
+      talkActiveRef.current = false;
+      releaseInFlightRef.current = false;
       setState((current) => (
         current === 'thinking' || current === 'speaking' ? 'idle' : current
       ));
-    }, VOICE_COMPLETION_TIMEOUT_MS);
+    }, timeoutMs);
   }, [clearCompletionTimer]);
 
   useEffect(() => {
-    if (connectionStatus === 'error') setState('error');
-    else if (connectionStatus !== 'connected' && state === 'error') setState('idle');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionStatus]);
+    if (connectionStatus === 'error') {
+      clearCompletionTimer();
+      talkActiveRef.current = false;
+      releaseInFlightRef.current = false;
+      setState('error');
+    } else if (connectionStatus !== 'connected') {
+      clearCompletionTimer();
+      talkActiveRef.current = false;
+      releaseInFlightRef.current = false;
+      setState('idle');
+    } else {
+      setState((current) => (current === 'error' ? 'idle' : current));
+    }
+  }, [connectionStatus, clearCompletionTimer]);
 
   useEffect(() => {
     const unsub = client.onData((msg) => {
@@ -76,12 +97,28 @@ export function useVoiceAssistant() {
             armCompletionTimer();
             setState('speaking');
           }
+        } else if (msg.final) {
+          // Recognition succeeded, but the LLM has not started yet. Keep the
+          // short transition deadline until an explicit llm:start arrives.
+          armCompletionTimer(VOICE_STT_TIMEOUT_MS);
         }
         return;
       }
       if (isPhaseEvent(msg)) {
-        if (msg.phase === 'tts' && msg.edge === 'start') {
+        if (msg.phase === 'stt') {
+          // Re-arm on both edges: after STT completes, allow a bounded grace
+          // period for the LLM to start. Empty/no-speech turns then recover.
+          armCompletionTimer(VOICE_STT_TIMEOUT_MS);
+        } else if (msg.phase === 'llm') {
+          // The model call itself may legitimately be long. Once it ends,
+          // require TTS to start promptly instead of showing
+          // "Elaborazione…" for the full whole-turn watchdog.
+          armCompletionTimer(
+            msg.edge === 'start' ? VOICE_COMPLETION_TIMEOUT_MS : VOICE_STT_TIMEOUT_MS,
+          );
+        } else if (msg.phase === 'tts' && msg.edge === 'start') {
           armCompletionTimer();
+          setState((current) => (current === 'thinking' ? 'speaking' : current));
         } else if (msg.phase === 'tts' && msg.edge === 'end') {
           // TTS completion is authoritative for the visual state and is
           // independent of the optional transcript mirror event.
@@ -103,16 +140,34 @@ export function useVoiceAssistant() {
   }, [client, armCompletionTimer, clearCompletionTimer]);
 
   const startTalk = useCallback(async () => {
-    if (connectionStatus !== 'connected') return;
+    if (connectionStatus !== 'connected' || talkActiveRef.current) return false;
+    talkActiveRef.current = true;
+    releaseInFlightRef.current = false;
     clearCompletionTimer();
     setState('listening');
-    await client.startTalking();
+    const published = await client.startTalking();
+    if (!published && talkActiveRef.current) {
+      talkActiveRef.current = false;
+      setState((current) => (current === 'listening' ? 'idle' : current));
+    }
+    return published;
   }, [client, connectionStatus, clearCompletionTimer]);
 
   const stopTalk = useCallback(async () => {
-    await client.stopTalking();
-    armCompletionTimer();
-    setState((s) => (s === 'listening' ? 'thinking' : s));
+    if (!talkActiveRef.current || releaseInFlightRef.current) return false;
+    releaseInFlightRef.current = true;
+    const published = await client.stopTalking();
+    talkActiveRef.current = false;
+    releaseInFlightRef.current = false;
+
+    if (!published) {
+      setState((current) => (current === 'listening' ? 'idle' : current));
+      return false;
+    }
+
+    armCompletionTimer(VOICE_STT_TIMEOUT_MS);
+    setState((current) => (current === 'listening' ? 'thinking' : current));
+    return true;
   }, [client, armCompletionTimer]);
 
   const respondConfirm = useCallback((actionId, confirmed) => {

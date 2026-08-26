@@ -198,25 +198,28 @@ export default class VoiceRoomClient {
    */
 
   async startTalking() {
-    if (this._micTrack || this._micStarting) return;
+    if (this._micTrack) return true;
+    if (this._micStarting || !this._room) return false;
     this._micStarting = true;
     const gen = (this._micGeneration += 1);
     let track = null;
     try {
       track = await createLocalAudioTrack();
-      if (gen !== this._micGeneration) { track.stop(); return; } // released before mic was ready
+      if (gen !== this._micGeneration) { track.stop(); return false; } // released before mic was ready
 
-      if (this._room) await this._room.localParticipant.publishTrack(track);
+      await this._room.localParticipant.publishTrack(track);
       if (gen !== this._micGeneration) {
         // released while the publish was in flight — tear down immediately
         if (this._room) { try { await this._room.localParticipant.unpublishTrack(track); } catch { /* ignore */ } }
         track.stop();
-        return;
+        return false;
       }
       this._micTrack = track;
+      return true;
     } catch (err) {
       console.warn('[VoiceRoom] mic publish failed:', err);
       track?.stop();
+      return false;
     } finally {
       this._micStarting = false;
     }
@@ -224,13 +227,14 @@ export default class VoiceRoomClient {
 
   async stopTalking() {
     this._micGeneration += 1; // invalidate any in-flight startTalking()
-    if (!this._micTrack) return;
+    if (!this._micTrack) return false;
     const track = this._micTrack;
     this._micTrack = null;
     try {
       if (this._room) await this._room.localParticipant.unpublishTrack(track);
     } catch { /* room may already be gone */ }
     track.stop(); // releases the OS mic indicator, not just mutes
+    return true;
   }
 
   get isTalking() {

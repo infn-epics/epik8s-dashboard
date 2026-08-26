@@ -92,7 +92,7 @@ describe('push-to-talk', () => {
     const micTrackStub = { stop: vi.fn() };
     createLocalAudioTrack.mockResolvedValue(micTrackStub);
 
-    await client.startTalking();
+    await expect(client.startTalking()).resolves.toBe(true);
 
     expect(createLocalAudioTrack).toHaveBeenCalledTimes(1);
     expect(room.localParticipant.publishTrack).toHaveBeenCalledWith(micTrackStub);
@@ -106,8 +106,8 @@ describe('push-to-talk', () => {
     const micTrackStub = { stop: vi.fn() };
     createLocalAudioTrack.mockResolvedValue(micTrackStub);
 
-    await client.startTalking();
-    await client.stopTalking();
+    await expect(client.startTalking()).resolves.toBe(true);
+    await expect(client.stopTalking()).resolves.toBe(true);
 
     expect(room.localParticipant.unpublishTrack).toHaveBeenCalledWith(micTrackStub);
     expect(micTrackStub.stop).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe('push-to-talk', () => {
   it('stopTalking is a no-op when talk was never started', async () => {
     const client = makeClient();
     await client.connect();
-    await expect(client.stopTalking()).resolves.toBeUndefined();
+    await expect(client.stopTalking()).resolves.toBe(false);
     expect(roomInstances[0].localParticipant.unpublishTrack).not.toHaveBeenCalled();
   });
 
@@ -132,16 +132,31 @@ describe('push-to-talk', () => {
 
     const startPromise = client.startTalking();
     // Release before the (still-pending, e.g. permission-prompt-blocked) track resolves.
-    await client.stopTalking();
+    await expect(client.stopTalking()).resolves.toBe(false);
     expect(client.isTalking).toBe(false);
 
     // The permission prompt is answered only *after* release.
     resolveTrack(micTrackStub);
-    await startPromise;
+    await expect(startPromise).resolves.toBe(false);
 
     expect(micTrackStub.stop).toHaveBeenCalledTimes(1);
     expect(room.localParticipant.publishTrack).not.toHaveBeenCalled();
     expect(client.isTalking).toBe(false);
+  });
+
+  it('reports a failed mic publication so the UI does not wait for STT that can never start', async () => {
+    const client = makeClient();
+    await client.connect();
+    const room = roomInstances[0];
+    const micTrackStub = { stop: vi.fn() };
+    createLocalAudioTrack.mockResolvedValue(micTrackStub);
+    room.localParticipant.publishTrack.mockRejectedValue(new Error('publish failed'));
+
+    await expect(client.startTalking()).resolves.toBe(false);
+
+    expect(micTrackStub.stop).toHaveBeenCalledTimes(1);
+    expect(client.isTalking).toBe(false);
+    await expect(client.stopTalking()).resolves.toBe(false);
   });
 });
 
