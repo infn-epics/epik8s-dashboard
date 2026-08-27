@@ -15,6 +15,7 @@ export const VOICE_COMPLETION_TIMEOUT_MS = 120000;
 // or a lost STT event must not leave the UI showing "Trascrizione…" for the
 // full whole-turn timeout.
 export const VOICE_STT_TIMEOUT_MS = 15000;
+const NO_RESPONSE_MESSAGE = 'Non ho ricevuto una risposta da ARGUS. Riprova tra qualche secondo.';
 
 /**
  * useVoiceAssistant — single-consumer hook (VoiceConsole.jsx) layering the
@@ -41,6 +42,19 @@ export function useVoiceAssistant() {
   const talkActiveRef = useRef(false);
   const releaseInFlightRef = useRef(false);
 
+  const reportNoResponse = useCallback(() => {
+    setTranscriptHistory((prev) => [...prev, {
+      role: 'assistant', text: NO_RESPONSE_MESSAGE, ts: Date.now(), error: true,
+    }]);
+    // When the agent itself is unavailable there is no server-side TTS. Give
+    // the operator an audible local fallback as well as the transcript entry.
+    if (typeof window !== 'undefined' && window.speechSynthesis
+      && typeof SpeechSynthesisUtterance !== 'undefined') {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(NO_RESPONSE_MESSAGE));
+    }
+  }, []);
+
   const clearCompletionTimer = useCallback(() => {
     if (completionTimerRef.current !== null) {
       clearTimeout(completionTimerRef.current);
@@ -54,11 +68,12 @@ export function useVoiceAssistant() {
       completionTimerRef.current = null;
       talkActiveRef.current = false;
       releaseInFlightRef.current = false;
+      reportNoResponse();
       setState((current) => (
-        current === 'thinking' || current === 'speaking' ? 'idle' : current
+        current === 'thinking' || current === 'speaking' ? 'error' : current
       ));
     }, timeoutMs);
-  }, [clearCompletionTimer]);
+  }, [clearCompletionTimer, reportNoResponse]);
 
   useEffect(() => {
     if (connectionStatus === 'error') {

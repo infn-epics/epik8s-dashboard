@@ -119,7 +119,7 @@ export default function ArgusView() {
             onPressEnd={stopTalk}
           />
           <span className="argus-state-label">{visualPhaseToLabel(visualPhase)}</span>
-          <TextPrompt connected={connected} busy={state !== 'idle'} onSubmit={sendText} />
+          <TextPrompt connected={connected} busy={['listening', 'thinking', 'speaking'].includes(state)} onSubmit={sendText} />
           <span className="argus-mic-hint">
             {armed ? 'Di’ "Argus" per parlare' : 'Tieni premuto per parlare'}
           </span>

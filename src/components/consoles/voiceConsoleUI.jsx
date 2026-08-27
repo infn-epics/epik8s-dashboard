@@ -22,7 +22,7 @@ const STATE_LABEL = {
   listening: 'In ascolto…',
   thinking: 'Elaborazione…',
   speaking: 'Risposta…',
-  error: 'Errore connessione',
+  error: 'Nessuna risposta',
 };
 
 export function voiceStateToIcon(state) {
@@ -70,7 +70,7 @@ const PHASE_LABEL = {
   stt: 'Trascrizione…',
   llm: 'Elaborazione…',
   tts: 'Risposta…',
-  error: 'Errore connessione',
+  error: 'Nessuna risposta',
 };
 
 export function visualPhaseToIcon(visualPhase) {

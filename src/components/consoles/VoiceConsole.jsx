@@ -120,7 +120,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
 
       <div className="voice-console-footer">
         <span className="voice-state-label">{visualPhaseToLabel(visualPhase)}</span>
-        <TextPrompt connected={connected} busy={state !== 'idle'} onSubmit={sendText} />
+        <TextPrompt connected={connected} busy={['listening', 'thinking', 'speaking'].includes(state)} onSubmit={sendText} />
         <VoiceOrb
           visualPhase={visualPhase}
           connected={connected}
