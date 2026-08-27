@@ -4,6 +4,7 @@ import {
   isTranscriptEvent,
   isConfirmRequestEvent,
   isTextInputEvent,
+  isVoiceErrorEvent,
   isPhaseEvent,
   isContentEvent,
   isContentChartEvent,
@@ -41,6 +42,11 @@ describe('type guards', () => {
     expect(isTextInputEvent({ type: 'text_input', text: 'stato BTF' })).toBe(true);
     expect(isTextInputEvent({ type: 'text_input', text: '  ' })).toBe(false);
     expect(isTextInputEvent({ type: 'text_input', text: 'x'.repeat(4001) })).toBe(false);
+  });
+
+  it('accepts a user-visible voice error payload', () => {
+    expect(isVoiceErrorEvent({ type: 'voice_error', code: 'tts_failed', message: 'Sintesi non disponibile' })).toBe(true);
+    expect(isVoiceErrorEvent({ type: 'voice_error', code: '', message: 'x' })).toBe(false);
   });
 
   it('accepts well-formed phase events', () => {

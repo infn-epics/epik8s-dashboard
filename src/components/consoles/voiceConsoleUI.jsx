@@ -142,6 +142,19 @@ export function TextPrompt({ connected, busy, onSubmit }) {
   );
 }
 
+/** Selects from the server-approved LLM models for the next voice session. */
+export function VoiceModelSelect({ models, value, disabled, onChange }) {
+  if (!models?.length) return null;
+  return (
+    <label className="voice-model-select">
+      <span>Modello</span>
+      <select value={value || models[0]?.id} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+        {models.map((model) => <option key={model.id} value={model.id}>{model.label || model.id}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function formatMs(ms) {
   return ms === null || ms === undefined ? '…' : `${Math.round(ms)} ms`;
 }

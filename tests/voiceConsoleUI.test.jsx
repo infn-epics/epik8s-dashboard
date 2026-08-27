@@ -8,6 +8,7 @@ import {
   visualPhaseToLabel,
   VoiceFabButton,
   VoiceOrb,
+  VoiceModelSelect,
   DebugPhasePanel,
   ConfirmationBanner,
   TranscriptPanel,
@@ -98,6 +99,16 @@ describe('VoiceOrb', () => {
       <VoiceOrb visualPhase="idle" connected armed={false} onPressStart={() => {}} onPressEnd={() => {}} />
     );
     expect(html).not.toContain('voice-orb--armed');
+  });
+});
+
+describe('VoiceModelSelect', () => {
+  it('renders only configured model choices', () => {
+    const html = renderToStaticMarkup(
+      <VoiceModelSelect models={[{ id: 'minimax-m27', label: 'MiniMax' }, { id: 'qwen36-27b', label: 'Qwen' }]} value="minimax-m27" onChange={() => {}} />,
+    );
+    expect(html).toContain('MiniMax');
+    expect(html).toContain('Qwen');
   });
 });
 

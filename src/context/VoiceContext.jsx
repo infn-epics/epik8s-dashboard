@@ -17,6 +17,7 @@ export function VoiceProvider({ children }) {
   const { voiceConfig } = useApp();
   const clientRef = useRef(null);
   const [connectionStatus, setConnectionStatus] = useState('idle');
+  const [selectedModel, setSelectedModel] = useState('');
 
   if (!clientRef.current) {
     clientRef.current = new VoiceRoomClient({});
@@ -37,13 +38,23 @@ export function VoiceProvider({ children }) {
     client.serverUrl = voiceConfig.serverUrl;
     client.roomName = voiceConfig.roomName;
     client.identityPrefix = voiceConfig.identityPrefix || 'operator';
+    const configuredModels = voiceConfig.models || [];
+    const defaultModel = voiceConfig.defaultModel || configuredModels[0]?.id || '';
+    const model = configuredModels.some((entry) => entry.id === selectedModel)
+      ? selectedModel : defaultModel;
+    client.model = model;
+    if (model !== selectedModel) setSelectedModel(model);
     client.connect();
 
     return () => client.disconnect();
-  }, [voiceConfig?.enabled, voiceConfig?.tokenEndpoint, voiceConfig?.serverUrl, voiceConfig?.roomName, voiceConfig?.identityPrefix]);
+  }, [voiceConfig?.enabled, voiceConfig?.tokenEndpoint, voiceConfig?.serverUrl, voiceConfig?.roomName, voiceConfig?.identityPrefix, voiceConfig?.defaultModel, voiceConfig?.models, selectedModel]);
 
   const connect = useCallback(() => clientRef.current.reconnectNow(), []);
   const disconnect = useCallback(() => clientRef.current.disconnect(), []);
+  const setModel = useCallback((model) => {
+    if (!voiceConfig?.models?.some((entry) => entry.id === model)) return;
+    setSelectedModel(model);
+  }, [voiceConfig?.models]);
 
   const value = {
     client: clientRef.current,
@@ -51,6 +62,8 @@ export function VoiceProvider({ children }) {
     enabled: !!voiceConfig?.enabled,
     connect,
     disconnect,
+    selectedModel,
+    setModel,
   };
 
   return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;

@@ -64,6 +64,12 @@ describe('VoiceRoomClient.connect', () => {
     expect(roomInstances[0].localParticipant.publishTrack).not.toHaveBeenCalled();
   });
 
+  it('includes the selected LLM model when minting its room token', async () => {
+    const client = makeClient({ model: 'qwen36-27b' });
+    await client.connect();
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).model).toBe('qwen36-27b');
+  });
+
   it('discards a superseded overlapping connect() attempt so data-channel events are not duplicated (regression: React StrictMode double-invokes the connect effect in dev, and any connect()/connect() race hits this)', async () => {
     const client = makeClient();
     // Two connect() calls before either token fetch resolves — this is

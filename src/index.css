@@ -837,6 +837,25 @@ body,
   gap: 6px;
 }
 
+.voice-model-select {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.voice-model-select select {
+  max-width: 150px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 5px;
+  font: inherit;
+}
+
 .voice-text-input {
   min-width: 0;
   flex: 1;
@@ -1267,6 +1286,10 @@ body,
 .argus-mic-panel .voice-text-form {
   width: calc(100% - 24px);
   flex: none;
+}
+
+.argus-mic-panel .voice-model-select {
+  flex-direction: column;
 }
 
 .argus-view--disabled {

@@ -91,6 +91,10 @@ function buildVoiceConfig(config, params) {
     serverUrl: overrides.serverUrl || va.serverUrl || '',
     roomName: overrides.roomName || va.roomName || '',
     identityPrefix: va.identityPrefix || 'operator',
+    models: Array.isArray(va.models) ? va.models.filter((model) => (
+      model && typeof model.id === 'string' && model.id
+    )) : [],
+    defaultModel: typeof va.defaultModel === 'string' ? va.defaultModel : '',
     highlightTtlMs: va.highlightTtlMs,
     // ?voiceDebug=1/0 overrides values.yaml's voiceAssistant.debug, which
     // lets a beamline ship with the latency debug panel always-on for ops

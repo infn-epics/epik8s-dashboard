@@ -7,7 +7,7 @@ import { useVoicePhase } from '../../hooks/useVoicePhase.js';
 import { useVoiceContent } from '../../hooks/useVoiceContent.js';
 import { useWakeWord } from '../../hooks/useWakeWord.js';
 import { buildChatFeed } from '../../voice/events.js';
-import { VoiceOrb, TextPrompt, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
+import { VoiceOrb, TextPrompt, VoiceModelSelect, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
 import { ChatFeed } from './voiceContentUI.jsx';
 
 // Shared with ArgusView.jsx by design - a preference toggled on one voice
@@ -28,7 +28,7 @@ const HANDS_FREE_LS_KEY = 'epik8s-voice-handsfree';
  */
 export default function VoiceConsole({ detached, onDetach, onClose }) {
   const { voiceConfig, pvwsClient } = useApp();
-  const { connectionStatus, connect } = useVoice();
+  const { connectionStatus, connect, selectedModel, setModel } = useVoice();
   const {
     state,
     partialTranscript,
@@ -120,6 +120,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
 
       <div className="voice-console-footer">
         <span className="voice-state-label">{visualPhaseToLabel(visualPhase)}</span>
+        <VoiceModelSelect models={voiceConfig?.models} value={selectedModel} disabled={state !== 'idle'} onChange={setModel} />
         <TextPrompt connected={connected} busy={['listening', 'thinking', 'speaking'].includes(state)} onSubmit={sendText} />
         <VoiceOrb
           visualPhase={visualPhase}

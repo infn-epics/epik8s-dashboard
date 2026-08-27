@@ -21,11 +21,12 @@ import { Room, RoomEvent, Track, createLocalAudioTrack } from 'livekit-client';
 import { computeBackoffDelay, MAX_RECONNECT_ATTEMPTS } from '../voice/events.js';
 
 export default class VoiceRoomClient {
-  constructor({ tokenEndpoint, serverUrl, roomName, identityPrefix = 'operator' } = {}) {
+  constructor({ tokenEndpoint, serverUrl, roomName, identityPrefix = 'operator', model = '' } = {}) {
     this.tokenEndpoint = tokenEndpoint;
     this.serverUrl = serverUrl;
     this.roomName = roomName;
     this.identityPrefix = identityPrefix;
+    this.model = model;
 
     this._room = null;
     this._micTrack = null;
@@ -155,7 +156,7 @@ export default class VoiceRoomClient {
     const res = await fetch(this.tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room: this.roomName, identity }),
+      body: JSON.stringify({ room: this.roomName, identity, model: this.model || undefined }),
     });
     if (!res.ok) throw new Error(`Token endpoint returned ${res.status}`);
     const body = await res.json();

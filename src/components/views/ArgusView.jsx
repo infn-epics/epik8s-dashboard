@@ -6,7 +6,7 @@ import { useVoicePhase } from '../../hooks/useVoicePhase.js';
 import { useVoiceContent } from '../../hooks/useVoiceContent.js';
 import { useWakeWord } from '../../hooks/useWakeWord.js';
 import { buildChatFeed } from '../../voice/events.js';
-import { VoiceOrb, TextPrompt, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
+import { VoiceOrb, TextPrompt, VoiceModelSelect, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
 import { ChatFeed } from '../consoles/voiceContentUI.jsx';
 
 // Shared with VoiceConsole.jsx by design - see that file's comment.
@@ -22,7 +22,7 @@ const HANDS_FREE_LS_KEY = 'epik8s-voice-handsfree';
  */
 export default function ArgusView() {
   const { voiceConfig, pvwsClient } = useApp();
-  const { connectionStatus, connect } = useVoice();
+  const { connectionStatus, connect, selectedModel, setModel } = useVoice();
   const {
     state,
     partialTranscript,
@@ -119,6 +119,7 @@ export default function ArgusView() {
             onPressEnd={stopTalk}
           />
           <span className="argus-state-label">{visualPhaseToLabel(visualPhase)}</span>
+          <VoiceModelSelect models={voiceConfig?.models} value={selectedModel} disabled={state !== 'idle'} onChange={setModel} />
           <TextPrompt connected={connected} busy={['listening', 'thinking', 'speaking'].includes(state)} onSubmit={sendText} />
           <span className="argus-mic-hint">
             {armed ? 'Di’ "Argus" per parlare' : 'Tieni premuto per parlare'}

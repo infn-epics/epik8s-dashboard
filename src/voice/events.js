@@ -13,6 +13,7 @@ export const EVENT_TYPES = {
   CONFIRM_REQUEST: 'confirm_request',
   CONFIRM_ACTION: 'confirm_action',
   TEXT_INPUT: 'text_input',
+  ERROR: 'voice_error',
   PHASE: 'phase',
   CONTENT: 'content',
 };
@@ -56,6 +57,12 @@ export function isTextInputEvent(msg) {
   return !!msg && msg.type === EVENT_TYPES.TEXT_INPUT
     && typeof msg.text === 'string' && !!msg.text.trim()
     && msg.text.length <= 4000;
+}
+
+export function isVoiceErrorEvent(msg) {
+  return !!msg && msg.type === EVENT_TYPES.ERROR
+    && typeof msg.code === 'string' && !!msg.code
+    && typeof msg.message === 'string' && !!msg.message;
 }
 
 export function isPhaseEvent(msg) {

@@ -5,6 +5,7 @@ import {
   isTranscriptEvent,
   isConfirmRequestEvent,
   isPhaseEvent,
+  isVoiceErrorEvent,
 } from '../voice/events.js';
 
 // A lost data-channel completion event must not leave the control stuck in
@@ -42,16 +43,16 @@ export function useVoiceAssistant() {
   const talkActiveRef = useRef(false);
   const releaseInFlightRef = useRef(false);
 
-  const reportNoResponse = useCallback(() => {
+  const reportFailure = useCallback((message = NO_RESPONSE_MESSAGE) => {
     setTranscriptHistory((prev) => [...prev, {
-      role: 'assistant', text: NO_RESPONSE_MESSAGE, ts: Date.now(), error: true,
+      role: 'assistant', text: message, ts: Date.now(), error: true,
     }]);
     // When the agent itself is unavailable there is no server-side TTS. Give
     // the operator an audible local fallback as well as the transcript entry.
     if (typeof window !== 'undefined' && window.speechSynthesis
       && typeof SpeechSynthesisUtterance !== 'undefined') {
       window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(NO_RESPONSE_MESSAGE));
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(message));
     }
   }, []);
 
@@ -68,12 +69,12 @@ export function useVoiceAssistant() {
       completionTimerRef.current = null;
       talkActiveRef.current = false;
       releaseInFlightRef.current = false;
-      reportNoResponse();
+      reportFailure();
       setState((current) => (
         current === 'thinking' || current === 'speaking' ? 'error' : current
       ));
     }, timeoutMs);
-  }, [clearCompletionTimer, reportNoResponse]);
+  }, [clearCompletionTimer, reportFailure]);
 
   useEffect(() => {
     if (connectionStatus === 'error') {
@@ -146,13 +147,20 @@ export function useVoiceAssistant() {
       }
       if (isConfirmRequestEvent(msg)) {
         setPendingConfirm(msg);
+        return;
+      }
+      if (isVoiceErrorEvent(msg)) {
+        clearCompletionTimer();
+        setPartialTranscript(null);
+        reportFailure(msg.message);
+        setState('error');
       }
     });
     return () => {
       unsub();
       clearCompletionTimer();
     };
-  }, [client, armCompletionTimer, clearCompletionTimer]);
+  }, [client, armCompletionTimer, clearCompletionTimer, reportFailure]);
 
   const startTalk = useCallback(async () => {
     if (connectionStatus !== 'connected' || talkActiveRef.current) return false;
