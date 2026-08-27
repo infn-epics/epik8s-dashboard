@@ -180,6 +180,20 @@ export function useVoiceAssistant() {
     setPendingConfirm((prev) => (prev?.action_id === actionId ? null : prev));
   }, [client]);
 
+  const sendText = useCallback((rawText) => {
+    const text = typeof rawText === 'string' ? rawText.trim() : '';
+    // One active turn at a time avoids interleaving a typed request with a
+    // pressed microphone turn or a response already being spoken.
+    if (!text || text.length > 4000 || connectionStatus !== 'connected'
+      || talkActiveRef.current || state !== 'idle') return false;
+
+    clearCompletionTimer();
+    client.sendData({ type: EVENT_TYPES.TEXT_INPUT, text, ts: Date.now() });
+    armCompletionTimer();
+    setState('thinking');
+    return true;
+  }, [client, connectionStatus, state, armCompletionTimer, clearCompletionTimer]);
+
   return {
     state,
     connectionStatus,
@@ -188,6 +202,7 @@ export function useVoiceAssistant() {
     pendingConfirm,
     startTalk,
     stopTalk,
+    sendText,
     respondConfirm,
     isTalking: client.isTalking,
   };

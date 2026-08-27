@@ -84,6 +84,20 @@ describe('VoiceRoomClient.connect', () => {
   });
 });
 
+describe('VoiceRoomClient data channel', () => {
+  it('publishes reliable JSON data after connecting', async () => {
+    const client = makeClient();
+    await client.connect();
+
+    client.sendData({ type: 'text_input', text: 'stato BTF' });
+
+    expect(roomInstances[0].localParticipant.publishData).toHaveBeenCalledWith(
+      new TextEncoder().encode(JSON.stringify({ type: 'text_input', text: 'stato BTF' })),
+      { reliable: true },
+    );
+  });
+});
+
 describe('push-to-talk', () => {
   it('startTalking publishes a mic track only on explicit activation', async () => {
     const client = makeClient();

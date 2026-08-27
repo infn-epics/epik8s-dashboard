@@ -7,6 +7,8 @@
  * tests/cameraWidget.test.jsx).
  */
 
+import { useState } from 'react';
+
 const STATE_ICON = {
   idle: '🎙',
   listening: '🔴',
@@ -109,6 +111,34 @@ export function VoiceOrb({ visualPhase, connected, disabled, armed, onPressStart
       <span className="voice-orb-ring" />
       <span className="voice-orb-icon">{icon}</span>
     </button>
+  );
+}
+
+/** Compact typed-input companion to the push-to-talk control. */
+export function TextPrompt({ connected, busy, onSubmit }) {
+  const [text, setText] = useState('');
+  const disabled = !connected || busy;
+
+  const submit = (event) => {
+    event.preventDefault();
+    if (onSubmit(text)) setText('');
+  };
+
+  return (
+    <form className="voice-text-form" onSubmit={submit}>
+      <input
+        className="voice-text-input"
+        value={text}
+        maxLength={4000}
+        disabled={disabled}
+        onChange={(event) => setText(event.target.value)}
+        placeholder={connected ? 'Scrivi una richiesta…' : 'Assistente non connesso'}
+        aria-label="Richiesta testuale ad ARGUS"
+      />
+      <button className="voice-text-send" type="submit" disabled={disabled || !text.trim()} title="Invia richiesta">
+        Invia
+      </button>
+    </form>
   );
 }
 

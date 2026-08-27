@@ -7,7 +7,7 @@ import { useVoicePhase } from '../../hooks/useVoicePhase.js';
 import { useVoiceContent } from '../../hooks/useVoiceContent.js';
 import { useWakeWord } from '../../hooks/useWakeWord.js';
 import { buildChatFeed } from '../../voice/events.js';
-import { VoiceOrb, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
+import { VoiceOrb, TextPrompt, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from './voiceConsoleUI.jsx';
 import { ChatFeed } from './voiceContentUI.jsx';
 
 // Shared with ArgusView.jsx by design - a preference toggled on one voice
@@ -36,6 +36,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
     pendingConfirm,
     startTalk,
     stopTalk,
+    sendText,
     respondConfirm,
   } = useVoiceAssistant();
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
@@ -119,6 +120,7 @@ export default function VoiceConsole({ detached, onDetach, onClose }) {
 
       <div className="voice-console-footer">
         <span className="voice-state-label">{visualPhaseToLabel(visualPhase)}</span>
+        <TextPrompt connected={connected} busy={state !== 'idle'} onSubmit={sendText} />
         <VoiceOrb
           visualPhase={visualPhase}
           connected={connected}

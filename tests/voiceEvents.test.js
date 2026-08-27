@@ -3,6 +3,7 @@ import {
   isHighlightEvent,
   isTranscriptEvent,
   isConfirmRequestEvent,
+  isTextInputEvent,
   isPhaseEvent,
   isContentEvent,
   isContentChartEvent,
@@ -34,6 +35,12 @@ describe('type guards', () => {
   it('accepts a well-formed confirm_request', () => {
     expect(isConfirmRequestEvent({ type: 'confirm_request', action_id: 'a1', label: 'Spegnere Q1?' })).toBe(true);
     expect(isConfirmRequestEvent({ type: 'confirm_request', action_id: '', label: 'x' })).toBe(false);
+  });
+
+  it('accepts bounded non-empty text input only', () => {
+    expect(isTextInputEvent({ type: 'text_input', text: 'stato BTF' })).toBe(true);
+    expect(isTextInputEvent({ type: 'text_input', text: '  ' })).toBe(false);
+    expect(isTextInputEvent({ type: 'text_input', text: 'x'.repeat(4001) })).toBe(false);
   });
 
   it('accepts well-formed phase events', () => {

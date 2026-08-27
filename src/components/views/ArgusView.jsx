@@ -6,7 +6,7 @@ import { useVoicePhase } from '../../hooks/useVoicePhase.js';
 import { useVoiceContent } from '../../hooks/useVoiceContent.js';
 import { useWakeWord } from '../../hooks/useWakeWord.js';
 import { buildChatFeed } from '../../voice/events.js';
-import { VoiceOrb, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
+import { VoiceOrb, TextPrompt, ConfirmationBanner, DebugPhasePanel, visualPhaseToLabel } from '../consoles/voiceConsoleUI.jsx';
 import { ChatFeed } from '../consoles/voiceContentUI.jsx';
 
 // Shared with VoiceConsole.jsx by design - see that file's comment.
@@ -30,6 +30,7 @@ export default function ArgusView() {
     pendingConfirm,
     startTalk,
     stopTalk,
+    sendText,
     respondConfirm,
   } = useVoiceAssistant();
   const { visualPhase, liveDurationMs, recentTurns } = useVoicePhase(state);
@@ -118,6 +119,7 @@ export default function ArgusView() {
             onPressEnd={stopTalk}
           />
           <span className="argus-state-label">{visualPhaseToLabel(visualPhase)}</span>
+          <TextPrompt connected={connected} busy={state !== 'idle'} onSubmit={sendText} />
           <span className="argus-mic-hint">
             {armed ? 'Di’ "Argus" per parlare' : 'Tieni premuto per parlare'}
           </span>

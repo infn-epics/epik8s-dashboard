@@ -12,6 +12,7 @@ export const EVENT_TYPES = {
   TRANSCRIPT: 'transcript',
   CONFIRM_REQUEST: 'confirm_request',
   CONFIRM_ACTION: 'confirm_action',
+  TEXT_INPUT: 'text_input',
   PHASE: 'phase',
   CONTENT: 'content',
 };
@@ -47,6 +48,14 @@ export function isConfirmRequestEvent(msg) {
   return !!msg && msg.type === EVENT_TYPES.CONFIRM_REQUEST
     && typeof msg.action_id === 'string' && !!msg.action_id
     && typeof msg.label === 'string';
+}
+
+// Browser-to-agent input. Keep this deliberately small and explicit: unlike
+// transcript events this is an operator request, not a mirrored result.
+export function isTextInputEvent(msg) {
+  return !!msg && msg.type === EVENT_TYPES.TEXT_INPUT
+    && typeof msg.text === 'string' && !!msg.text.trim()
+    && msg.text.length <= 4000;
 }
 
 export function isPhaseEvent(msg) {

@@ -830,6 +830,41 @@ body,
   color: var(--text-dim);
 }
 
+.voice-text-form {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}
+
+.voice-text-input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.voice-text-send {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--bg);
+  padding: 6px 9px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.voice-text-input:disabled,
+.voice-text-send:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .voice-fab-btn {
   width: 44px;
   height: 44px;
@@ -1227,6 +1262,11 @@ body,
 .argus-mic-hint {
   font-size: 12px;
   color: var(--text-dim);
+}
+
+.argus-mic-panel .voice-text-form {
+  width: calc(100% - 24px);
+  flex: none;
 }
 
 .argus-view--disabled {
