@@ -9,6 +9,7 @@ import {
   parseMagnetFile, snapshotToCsv,
   applyMagnets, summarizeApply,
   effectiveSteps, stepValue, pretuneRow,
+  magnetFunc, stepCurrent, applyBulk,
 } from '../src/services/magnetProcedures.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -305,5 +306,96 @@ describe('pretune steps', () => {
 
   it('is a single jump when nsteps is 0', () => {
     expect(pretuneRow(0, 50, 0, 0)).toEqual({ calcstep: 50, set: 0, next: 50, prev: 0 });
+  });
+});
+
+describe('magnetFunc', () => {
+  it('lets an explicit devfunc win', () => {
+    expect(magnetFunc('QUATB101', 'unimag', 'SPECIAL')).toBe('SPECIAL');
+  });
+
+  it('infers the function from the device name, like conf_to_dev', () => {
+    expect(magnetFunc('HCOR06', 'biltitest')).toBe('COR');
+    expect(magnetFunc('CHHTB001', 'unimag')).toBe('COR');
+    expect(magnetFunc('QUATB101', 'unimag')).toBe('QUA');
+    expect(magnetFunc('SBNDPL01', 'modbusps')).toBe('DIP');
+    expect(magnetFunc('DHSTB001', 'unimag')).toBe('DIP');
+    expect(magnetFunc('SOL01:COIL01', 'sigmaphi')).toBe('SOL');
+    expect(magnetFunc('SEX02', 'x')).toBe('SEX');
+    expect(magnetFunc('UFS1', 'x')).toBe('UFS');
+  });
+
+  it('checks the families in the OPI order and falls back to the model', () => {
+    expect(magnetFunc('HCORQUA1', 'x')).toBe('COR');
+    expect(magnetFunc('PS42', 'modbusps')).toBe('modbusps');
+    expect(magnetFunc('PS42', '')).toBe('');
+  });
+
+  it('is set on the magnets of a configuration', () => {
+    const magnets = magnetDevices(parseDevices(loadFixture('eli-values.yaml')));
+    const byName = Object.fromEntries(magnets.map((m) => [m.name, m]));
+    expect(byName.HCOR06).toMatchObject({ func: 'COR', model: 'bilt-itest' });
+    expect(byName.COIL01.func).toBe('SOL');
+    expect(byName.DIP01.func).toBe('DIP');
+    expect(byName.QUAD01.func).toBe('QUA');
+  });
+});
+
+describe('stepCurrent', () => {
+  it('adds and subtracts the step, whatever the sign given', () => {
+    expect(stepCurrent(10, 2, 1)).toBe(12);
+    expect(stepCurrent(10, 2, -1)).toBe(8);
+    expect(stepCurrent(10, -2, 1)).toBe(12);
+  });
+
+  it('does not accumulate floating point noise', () => {
+    expect(0.1 + 0.2).not.toBe(0.3);
+    expect(stepCurrent(0.1, 0.2, 1)).toBe(0.3);
+    expect(0.3 - 0.1).not.toBe(0.2);
+    expect(stepCurrent(0.3, 0.1, -1)).toBe(0.2);
+  });
+});
+
+describe('applyBulk', () => {
+  const makeIo = (values = {}, failOn = null) => {
+    const writes = [];
+    return {
+      writes,
+      readNumber: (pv) => values[pv] ?? null,
+      write: (pv, v) => {
+        if (pv === failOn) throw new Error('write refused');
+        writes.push([pv, v]);
+      },
+    };
+  };
+
+  it('writes STATE_SP of every selected magnet', () => {
+    const io = makeIo();
+    const result = applyBulk({ type: 'state', state: 'RESET' }, ['A:B:PS1', 'A:B:PS2'], io);
+    expect(io.writes).toEqual([['A:B:PS1:STATE_SP', 'RESET'], ['A:B:PS2:STATE_SP', 'RESET']]);
+    expect(result).toEqual({ done: ['A:B:PS1', 'A:B:PS2'], errors: [] });
+  });
+
+  it('zeroes CURRENT_SP', () => {
+    const io = makeIo();
+    applyBulk({ type: 'zero' }, ['A:PS1'], io);
+    expect(io.writes).toEqual([['A:PS1:CURRENT_SP', 0]]);
+  });
+
+  it('steps CURRENT_SP from its live value', () => {
+    const io = makeIo({ 'A:PS1:CURRENT_SP': 0.1, 'A:PS2:CURRENT_SP': -3 });
+    applyBulk({ type: 'step', step: 0.2, sign: 1 }, ['A:PS1', 'A:PS2'], io);
+    expect(io.writes).toEqual([['A:PS1:CURRENT_SP', 0.3], ['A:PS2:CURRENT_SP', -2.8]]);
+  });
+
+  it('reports the magnets it cannot act on and carries on with the others', () => {
+    const io = makeIo({ 'A:PS2:CURRENT_SP': 1 }, 'A:PS3:CURRENT_SP');
+    const result = applyBulk({ type: 'step', step: 1, sign: -1 }, ['A:PS1', 'A:PS2', 'A:PS3'], io);
+    expect(result.done).toEqual(['A:PS2']);
+    expect(result.errors).toEqual([
+      'A:PS1: A:PS1:CURRENT_SP has no value',
+      'A:PS3: A:PS3:CURRENT_SP has no value',
+    ]);
+    expect(io.writes).toEqual([['A:PS2:CURRENT_SP', 0]]);
   });
 });

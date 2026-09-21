@@ -69,7 +69,7 @@ function NavItems({ items }) {
 }
 
 const MAGNET_PROCEDURE_PATHS = [
-  '/tools/magnets/pretune', '/tools/magnets/save', '/tools/magnets/restore',
+  '/tools/magnets/array', '/tools/magnets/pretune', '/tools/magnets/save', '/tools/magnets/restore',
   '/tools/magnets/save-dataset', '/tools/magnets/load-dataset',
 ];
 
@@ -80,7 +80,7 @@ const MAGNET_PROCEDURE_PATHS = [
  *   Controls  — Dashboards, Beamline, Layout
  *   Monitor   — Cameras, Instrumentation
  *   Ops       — K8s, Tickets
- *   Tools     — Procedures > Magnets > Pretune, Save/Restore Snapshot, Save/Load Dataset
+ *   Tools     — Procedures > Magnets > Array, Pretune, Save/Restore Snapshot, Save/Load Dataset
  *   (global)  — Settings
  *
  * Console panels dock at the bottom and can be popped out.
@@ -198,6 +198,8 @@ export default function AppShell({ children, theme, onToggleTheme }) {
           icon: '🧲',
           label: 'Magnets',
           children: [
+            { to: '/tools/magnets/array', icon: '📋', label: 'Magnet Array',
+              title: 'All magnets as an array: filter, select, set state and current' },
             { to: '/tools/magnets/pretune', icon: '🎚', label: 'Pretune' },
             { to: '/tools/magnets/save',    icon: '💾', label: 'Save Snapshot',
               title: 'Set current and state of the selected power supplies' },

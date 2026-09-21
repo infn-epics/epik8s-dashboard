@@ -9314,6 +9314,22 @@ body,
   cursor: not-allowed;
 }
 
+a.mag-proc-btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.mag-proc-btn--sm {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+
+.mag-proc-btn.matched {
+  background: var(--green);
+  border-color: var(--green);
+  color: #052e1c;
+}
+
 .mag-proc-btn--primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -9449,3 +9465,22 @@ body,
 
 .mag-proc-led.ok  { background: var(--green); border-color: var(--green); }
 .mag-proc-led.bad { background: var(--red);   border-color: var(--red); }
+
+/* Magnet array: direction of the current and the per-row commands */
+.mag-pol {
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.mag-pol.pos  { color: var(--red); }
+.mag-pol.neg  { color: var(--accent); }
+.mag-pol.bad  { color: var(--red); }
+.mag-pol.off  { opacity: 0.6; }
+
+.mag-array-cmds {
+  display: inline-flex;
+  gap: 4px;
+}

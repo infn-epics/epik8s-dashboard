@@ -116,6 +116,7 @@ export function parseDevices(config) {
         iocRoot,
         pvPrefix,
         type,
+        devfunc: dev.devfunc || ioc.devfunc || '',
         family,
         zone: devZone.zone,
         allZones: devZone.allZones,

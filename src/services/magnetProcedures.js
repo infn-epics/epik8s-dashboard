@@ -1,5 +1,5 @@
 /**
- * Magnet procedures — pretune, save, restore.
+ * Magnet procedures — array, pretune, save, restore.
  *
  * Port of the Phoebus displays in epik8s-btf/opi/epik8s-opi/unimag-opi
  * (pretune/, restore/, SaveDynamic.py) and of Scripts/magapply.py, keeping the
@@ -43,8 +43,31 @@ export function splitBase(base) {
 }
 
 /**
+ * Function of a magnet (COR, QUA, DIP, SOL, SEX, UFS): the "Type" filter of mag_dynamic.bob.
+ * An explicit devfunc of the configuration wins; otherwise it is inferred from the device
+ * name, in this order, like epik8sutil.conf_to_dev does; anything else keeps its model.
+ */
+const FUNC_BY_NAME = [
+  ['COR', ['HCV', 'HCOR', 'VCOR', 'HCR', 'VCR', 'CHH', 'CVV']],
+  ['QUA', ['QUA', 'QUAD', 'QSK']],
+  ['DIP', ['DIP', 'DPL', 'DHS', 'DHR', 'DHP']],
+  ['SOL', ['SOL']],
+  ['SEX', ['SEX']],
+  ['UFS', ['UFS']],
+];
+
+export function magnetFunc(name, model, explicit = '') {
+  if (explicit) return explicit;
+  const deviceName = String(name ?? '');
+  for (const [func, tokens] of FUNC_BY_NAME) {
+    if (tokens.some((t) => deviceName.includes(t))) return func;
+  }
+  return model || '';
+}
+
+/**
  * The magnet power supplies of the configuration (devgroup "mag"), as
- * { base, prefix, name, root, zones, iocName }.
+ * { base, prefix, name, root, zones, func, model, iocName }.
  * `root` is the device as the OPI's R macro sees it (iocroot:name), used to
  * map the names of a plain-text dataset.
  */
@@ -62,6 +85,8 @@ export function magnetDevices(devices) {
         name,
         root,
         zones: d.allZones?.length ? d.allZones : (d.zone ? [d.zone] : []),
+        func: magnetFunc(d.name, d.type, d.devfunc),
+        model: d.type || '',
         iocName: d.iocName,
       };
     });
@@ -369,4 +394,46 @@ export function pretuneRow(i0, i1, nsteps, counter) {
     next: stepValue(i0, i1, n, counter + 1),
     prev: stepValue(i0, i1, n, counter - 1),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bulk actions on the selected magnets (mag_dynamic.bob)              */
+/* ------------------------------------------------------------------ */
+
+/** Commands of STATE_SP the array offers (ON/OFF/RESET buttons). */
+export const STATE_COMMANDS = ['ON', 'OFF', 'RESET'];
+
+/** CURRENT_SP +/- step, rounded so that 10.1 + 0.1 does not become 10.200000000000001. */
+export function stepCurrent(current, step, sign) {
+  return Math.round((current + sign * Math.abs(step)) * 1e6) / 1e6;
+}
+
+/**
+ * ON / OFF / RESET, ZERO and the "-" / "+" buttons of the selected magnets.
+ *
+ * action: { type: 'state', state } | { type: 'zero' } | { type: 'step', step, sign }
+ * io    : { readNumber(pv), write(pv, value) }   (see createPvIo)
+ *
+ * Returns { done: [base], errors: [string] }.
+ */
+export function applyBulk(action, bases, io) {
+  const done = [];
+  const errors = [];
+  for (const base of bases) {
+    try {
+      if (action.type === 'state') {
+        io.write(`${base}:STATE_SP`, action.state);
+      } else if (action.type === 'zero') {
+        io.write(`${base}:CURRENT_SP`, 0);
+      } else {
+        const sp = io.readNumber(`${base}:CURRENT_SP`);
+        if (sp === null || sp === undefined) throw new Error(`${base}:CURRENT_SP has no value`);
+        io.write(`${base}:CURRENT_SP`, stepCurrent(sp, action.step, action.sign));
+      }
+      done.push(base);
+    } catch (err) {
+      errors.push(`${base}: ${err.message || err}`);
+    }
+  }
+  return { done, errors };
 }

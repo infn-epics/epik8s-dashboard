@@ -18,6 +18,7 @@ import SoftIOCView from './components/views/SoftIOCView.jsx';
 import OpsFilesView from './components/views/OpsFilesView.jsx';
 import OpsArchiverView from './components/views/OpsArchiverView.jsx';
 import ArgusView from './components/views/ArgusView.jsx';
+import MagnetArrayView from './components/views/magnets/MagnetArrayView.jsx';
 import MagnetPretuneView from './components/views/magnets/MagnetPretuneView.jsx';
 import MagnetSaveView from './components/views/magnets/MagnetSaveView.jsx';
 import MagnetRestoreView from './components/views/magnets/MagnetRestoreView.jsx';
@@ -122,6 +123,7 @@ function AppRoutes() {
                     <Route path="/argus" element={<ArgusView />} />
                     <Route path="/ops/files" element={<OpsFilesView />} />
                     <Route path="/ops/archiver" element={<OpsArchiverView />} />
+                    <Route path="/tools/magnets/array" element={<MagnetArrayView />} />
                     <Route path="/tools/magnets/pretune" element={<MagnetPretuneView />} />
                     <Route path="/tools/magnets/save" element={<MagnetSaveView />} />
                     <Route path="/tools/magnets/restore" element={<MagnetRestoreView />} />
