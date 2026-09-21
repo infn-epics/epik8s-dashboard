@@ -230,6 +230,47 @@ body,
   color: #fff;
 }
 
+/* Nested submenus (Tools > Procedures > Magnets > ...) */
+.nav-dropdown-heading {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+.nav-submenu {
+  position: relative;
+}
+
+.nav-submenu-trigger {
+  width: 100%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.nav-submenu-trigger.has-active {
+  color: var(--accent);
+}
+
+.nav-submenu-caret {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* Overlaps the parent by a few px so the pointer never crosses a gap that would close it */
+.nav-dropdown.nav-flyout {
+  top: -5px;
+  left: calc(100% - 4px);
+}
+
 /* ===== Console Toggle Buttons ===== */
 .console-toggle-btn {
   background: none;
@@ -9200,3 +9241,211 @@ body,
   font-weight: 600;
   padding: 1px 2px;
 }
+
+
+/* ===== Tools — Magnet procedures (Pretune / Save / Restore) ===== */
+.mag-proc {
+  padding: 14px 16px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mag-proc-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.mag-proc-head p {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.mag-proc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mag-proc-spacer {
+  flex: 1;
+}
+
+.mag-proc-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.mag-proc-input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.82rem;
+  font-family: inherit;
+}
+
+.mag-proc-input[aria-invalid="true"] {
+  border-color: var(--red);
+}
+
+.mag-proc-btn {
+  background: var(--surface-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.mag-proc-btn:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.mag-proc-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mag-proc-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.mag-proc-btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.mag-proc-filename {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.mag-proc-count {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.mag-proc-empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.mag-proc-status {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  background: var(--surface);
+}
+
+.mag-proc-status--ok    { border-color: var(--green); }
+.mag-proc-status--warn  { border-color: var(--yellow); }
+.mag-proc-status--error { border-color: var(--red); color: var(--red); }
+
+.mag-proc-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.mag-proc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.mag-proc-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.mag-proc-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.mag-proc-table tr:hover td {
+  background: var(--surface-hover);
+}
+
+.mag-proc-table tr.selected td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.mag-proc-table tr.disabled td {
+  opacity: 0.5;
+}
+
+.mag-proc-table .num {
+  text-align: right;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Boxes: same colours as the PS widget state — green = reached, red = MAJOR / off target, yellow = MINOR/WARNING */
+.mag-proc-state,
+.mag-proc-delta {
+  display: inline-block;
+  min-width: 52px;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  text-align: center;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.mag-proc-state.matched,
+.mag-proc-delta.ok {
+  background: var(--green);
+  border-color: var(--green);
+  color: #052e1c;
+}
+
+.mag-proc-state.alarm-major,
+.mag-proc-delta.bad {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.mag-proc-state.alarm-minor {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: #2b1d00;
+}
+
+.mag-proc-led {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.mag-proc-led.ok  { background: var(--green); border-color: var(--green); }
+.mag-proc-led.bad { background: var(--red);   border-color: var(--red); }

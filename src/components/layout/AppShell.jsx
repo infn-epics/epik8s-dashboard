@@ -12,12 +12,75 @@ import CertWarningBanner from '../common/CertWarningBanner.jsx';
 import { version as APP_VERSION, author as APP_AUTHOR } from '../../../package.json';
 
 /**
+ * Entry of a dropdown that opens a flyout of further entries (recursive).
+ * Opens on hover and on click/Enter (touch, keyboard); Escape closes it.
+ */
+function NavSubmenu({ item }) {
+  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const active = (function has(children) {
+    return children.some(c => (c.children ? has(c.children) : c.to === pathname));
+  })(item.children);
+
+  return (
+    <div
+      className="nav-submenu"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+    >
+      <button
+        type="button"
+        className={`nav-dropdown-item nav-submenu-trigger ${active ? 'has-active' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <span>{item.icon}</span> {item.label}
+        <span className="nav-submenu-caret">▸</span>
+      </button>
+      {open && (
+        <div className="nav-dropdown nav-flyout" role="menu">
+          <NavItems items={item.children} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Items of a dropdown: links, `heading` captions and nested `children` submenus. */
+function NavItems({ items }) {
+  return items.map(item => {
+    if (item.heading) {
+      return <div key={item.heading} className="nav-dropdown-heading">{item.heading}</div>;
+    }
+    if (item.children) return <NavSubmenu key={item.label} item={item} />;
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        title={item.title}
+        className={({ isActive }) => `nav-dropdown-item ${isActive ? 'active' : ''}`}
+      >
+        <span>{item.icon}</span> {item.label}
+      </NavLink>
+    );
+  });
+}
+
+const MAGNET_PROCEDURE_PATHS = [
+  '/tools/magnets/pretune', '/tools/magnets/save', '/tools/magnets/restore',
+  '/tools/magnets/save-dataset', '/tools/magnets/load-dataset',
+];
+
+/**
  * AppShell — professional layout with grouped navbar, console panels, sidebar.
  *
  * Navigation groups:
  *   Controls  — Dashboards, Beamline, Layout
  *   Monitor   — Cameras, Instrumentation
  *   Ops       — K8s, Tickets
+ *   Tools     — Procedures > Magnets > Pretune, Save/Restore Snapshot, Save/Load Dataset
  *   (global)  — Settings
  *
  * Console panels dock at the bottom and can be popped out.
@@ -125,6 +188,29 @@ export default function AppShell({ children, theme, onToggleTheme }) {
         { to: '/ops/files', icon: '📁', label: 'Files' },
       ],
     },
+    {
+      label: 'Tools',
+      icon: '🛠',
+      paths: MAGNET_PROCEDURE_PATHS,
+      items: [
+        { heading: 'Procedures' },
+        {
+          icon: '🧲',
+          label: 'Magnets',
+          children: [
+            { to: '/tools/magnets/pretune', icon: '🎚', label: 'Pretune' },
+            { to: '/tools/magnets/save',    icon: '💾', label: 'Save Snapshot',
+              title: 'Set current and state of the selected power supplies' },
+            { to: '/tools/magnets/restore', icon: '♻',  label: 'Restore Snapshot',
+              title: 'Load a snapshot or dataset, compare, edit and restore the checked power supplies' },
+            { to: '/tools/magnets/save-dataset', icon: '📄', label: 'Save Dataset',
+              title: 'Simple save: readback current and state of the selected power supplies' },
+            { to: '/tools/magnets/load-dataset', icon: '📥', label: 'Load Dataset',
+              title: 'Simple load: apply a whole snapshot or dataset' },
+          ],
+        },
+      ],
+    },
   ];
 
   return (
@@ -154,15 +240,7 @@ export default function AppShell({ children, theme, onToggleTheme }) {
               </button>
               {openGroup === group.label && (
                 <div className="nav-dropdown">
-                  {group.items.map(item => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      className={({ isActive }) => `nav-dropdown-item ${isActive ? 'active' : ''}`}
-                    >
-                      <span>{item.icon}</span> {item.label}
-                    </NavLink>
-                  ))}
+                  <NavItems items={group.items} />
                 </div>
               )}
             </div>

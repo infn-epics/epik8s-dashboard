@@ -18,6 +18,9 @@ import SoftIOCView from './components/views/SoftIOCView.jsx';
 import OpsFilesView from './components/views/OpsFilesView.jsx';
 import OpsArchiverView from './components/views/OpsArchiverView.jsx';
 import ArgusView from './components/views/ArgusView.jsx';
+import MagnetPretuneView from './components/views/magnets/MagnetPretuneView.jsx';
+import MagnetSaveView from './components/views/magnets/MagnetSaveView.jsx';
+import MagnetRestoreView from './components/views/magnets/MagnetRestoreView.jsx';
 import { SoftIOCProvider } from './context/SoftIOCContext.jsx';
 import { VoiceProvider } from './context/VoiceContext.jsx';
 import { VoiceHighlightProvider } from './context/VoiceHighlightContext.jsx';
@@ -119,6 +122,11 @@ function AppRoutes() {
                     <Route path="/argus" element={<ArgusView />} />
                     <Route path="/ops/files" element={<OpsFilesView />} />
                     <Route path="/ops/archiver" element={<OpsArchiverView />} />
+                    <Route path="/tools/magnets/pretune" element={<MagnetPretuneView />} />
+                    <Route path="/tools/magnets/save" element={<MagnetSaveView />} />
+                    <Route path="/tools/magnets/restore" element={<MagnetRestoreView />} />
+                    <Route path="/tools/magnets/save-dataset" element={<MagnetSaveView simple />} />
+                    <Route path="/tools/magnets/load-dataset" element={<MagnetRestoreView simple />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </AppShell>
