@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { parseGitUrl, getFile, commitFile } from '../../services/gitApi.js';
 import { IOC_TEMPLATES, getTemplateKeys, resolveTemplate } from '../../models/iocTemplates.js';
+import { iocsToList, iocsToMap, replaceIoc, insertIocAfter, uniqueCopyName } from '../../models/iocs.js';
 
 /**
  * BeamlineEditor — edit IOCs and services from the values.yaml,
@@ -83,10 +84,20 @@ export default function BeamlineEditor() {
         if (!parsed.namespace) errors.push('Missing required field: namespace');
         if (!parsed.epicsConfiguration) errors.push('Missing epicsConfiguration section');
         const iocs = parsed.epicsConfiguration?.iocs;
-        if (iocs && !Array.isArray(iocs)) errors.push('epicsConfiguration.iocs must be a list');
-        if (Array.isArray(iocs)) {
+        if (iocs != null && typeof iocs !== 'object') {
+          errors.push('epicsConfiguration.iocs must be a mapping keyed by IOC name');
+        } else if (Array.isArray(iocs)) {
+          // Legacy list form: still readable, converted to a map on first edit
+          const seen = new Set();
           iocs.forEach((ioc, i) => {
-            if (!ioc.name) errors.push(`IOC #${i + 1}: missing name`);
+            if (!ioc?.name) errors.push(`IOC #${i + 1}: missing name`);
+            else if (seen.has(ioc.name)) errors.push(`IOC "${ioc.name}": duplicate name`);
+            else seen.add(ioc.name);
+          });
+        } else if (iocs) {
+          Object.entries(iocs).forEach(([key, ioc]) => {
+            if (!ioc || typeof ioc !== 'object') errors.push(`IOC "${key}": must be a mapping`);
+            else if (ioc.name && ioc.name !== key) errors.push(`IOC "${key}": name "${ioc.name}" differs from its key`);
           });
         }
         const services = parsed.epicsConfiguration?.services;
@@ -109,36 +120,58 @@ export default function BeamlineEditor() {
   }, [tryParse]);
 
   // ─── IOC Operations ───────────────────────────────────────────
-  const iocs = parsedConfig?.epicsConfiguration?.iocs || [];
+  // `iocs` is a list view (index-based UI) over the name-keyed map in the config
+  const rawIocs = parsedConfig?.epicsConfiguration?.iocs;
+  const iocs = useMemo(() => iocsToList(rawIocs), [rawIocs]);
   const services = parsedConfig?.epicsConfiguration?.services || {};
 
-  const updateIoc = (index, newData) => {
+  // Clone the config with `iocs` as a map (converts the legacy list form)
+  const cloneWithIocMap = () => {
     const cfg = structuredClone(parsedConfig);
-    cfg.epicsConfiguration.iocs[index] = newData;
+    if (!cfg.epicsConfiguration) cfg.epicsConfiguration = {};
+    cfg.epicsConfiguration.iocs = iocsToMap(cfg.epicsConfiguration.iocs);
+    return cfg;
+  };
+
+  const updateIoc = (index, newData) => {
+    const key = iocs[index].name;
+    const newKey = newData.name;
+    const cfg = cloneWithIocMap();
+    const map = cfg.epicsConfiguration.iocs;
+    if (!newKey) { alert('IOC name is required'); return; }
+    if (newKey !== key && Object.hasOwn(map, newKey)) {
+      alert(`IOC "${newKey}" already exists`);
+      return;
+    }
+    cfg.epicsConfiguration.iocs = replaceIoc(map, key, newKey, newData);
     rebuildYaml(cfg);
     setEditingItem(null);
   };
 
   const removeIoc = (index) => {
-    const cfg = structuredClone(parsedConfig);
-    cfg.epicsConfiguration.iocs.splice(index, 1);
+    const cfg = cloneWithIocMap();
+    delete cfg.epicsConfiguration.iocs[iocs[index].name];
     rebuildYaml(cfg);
   };
 
   const addIoc = (newIoc) => {
-    const cfg = structuredClone(parsedConfig);
-    if (!cfg.epicsConfiguration) cfg.epicsConfiguration = {};
-    if (!cfg.epicsConfiguration.iocs) cfg.epicsConfiguration.iocs = [];
-    cfg.epicsConfiguration.iocs.push(newIoc);
+    const cfg = cloneWithIocMap();
+    if (!newIoc.name) { alert('IOC name is required'); return; }
+    if (Object.hasOwn(cfg.epicsConfiguration.iocs, newIoc.name)) {
+      alert(`IOC "${newIoc.name}" already exists`);
+      return;
+    }
+    cfg.epicsConfiguration.iocs[newIoc.name] = newIoc;
     rebuildYaml(cfg);
     setAddingSection(null);
   };
 
   const cloneIoc = (index) => {
-    const clone = structuredClone(iocs[index]);
-    clone.name = clone.name + '-copy';
-    const cfg = structuredClone(parsedConfig);
-    cfg.epicsConfiguration.iocs.splice(index + 1, 0, clone);
+    const source = iocs[index];
+    const cfg = cloneWithIocMap();
+    const clone = structuredClone(source);
+    clone.name = uniqueCopyName(cfg.epicsConfiguration.iocs, source.name);
+    cfg.epicsConfiguration.iocs = insertIocAfter(cfg.epicsConfiguration.iocs, source.name, clone.name, clone);
     rebuildYaml(cfg);
     // Open the clone for editing
     setEditingItem({ section: 'ioc', index: index + 1, data: structuredClone(clone) });

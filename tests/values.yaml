@@ -226,7 +226,8 @@ epicsConfiguration:
     
   iocs:
 
-    - name: "pollux-ctrl01"
+    pollux-ctrl01:
+      name: "pollux-ctrl01"
       asset: "https://confluence.infn.it/x/JIBnLw"
       charturl: 'https://baltig.infn.it/epics-containers/ioc-chart.git'
       template: "motor"
@@ -267,7 +268,8 @@ epicsConfiguration:
             start: 10
             velo: 1
     
-    - name: "pollux-4-ctrl01"
+    pollux-4-ctrl01:
+      name: "pollux-4-ctrl01"
       asset: "https://confluence.infn.it/x/JIBnLw"
       charturl: 'https://baltig.infn.it/epics-containers/ioc-chart.git'
       template: "motor"
@@ -330,7 +332,8 @@ epicsConfiguration:
             home: 1
             start: 10
             velo: 1
-    - name: "pollux-6-ctrl01"
+    pollux-6-ctrl01:
+      name: "pollux-6-ctrl01"
       asset: "https://confluence.infn.it/x/JIBnLw"
       charturl: 'https://baltig.infn.it/epics-containers/ioc-chart.git'
       template: "motor"
@@ -371,7 +374,8 @@ epicsConfiguration:
             home: 1
             start: 10
             velo: 1
-    - name: "camerasim"
+    camerasim:
+      name: "camerasim"
       asset: "https://servicedesk.infn.it/secure/ObjectSchema.jspa?id=44&typeId=2748&objectId=126655"
       charturl: 'https://github.com/infn-epics/ioc-chart.git'     
       devtype: camerasim

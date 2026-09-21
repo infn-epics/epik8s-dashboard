@@ -20,6 +20,7 @@
 
 import yaml from 'js-yaml';
 import { proxyUrl } from './devProxy.js';
+import { iocsToList } from '../models/iocs.js';
 
 let _configUrl = null;
 let _cachedConfig = null;
@@ -38,7 +39,7 @@ const STATUS_COLORS = {
  * Returns { prefix, name } or null if not found.
  */
 export function findControllerInConfig(config) {
-  const iocs = config?.epicsConfiguration?.iocs || [];
+  const iocs = iocsToList(config?.epicsConfiguration?.iocs);
   const bc = iocs.find(
     (ioc) => ioc.name === 'beamline-controller' || ioc.devgroup === 'global'
   );

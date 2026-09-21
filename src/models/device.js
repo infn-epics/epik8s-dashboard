@@ -6,6 +6,8 @@
  * template, stream info, and any extra params.
  */
 
+import { iocsToList } from './iocs.js';
+
 function deepMerge(target, source) {
   const result = { ...target };
   for (const key of Object.keys(source)) {
@@ -65,7 +67,7 @@ export function parseDevices(config) {
   const namespace = config.namespace || beamline;
   const domain = config.epik8namespace || '';
   const iocDefaults = config.iocDefaults || {};
-  const iocs = config.epicsConfiguration?.iocs || [];
+  const iocs = iocsToList(config.epicsConfiguration?.iocs);
   const devices = [];
 
   for (const rawIoc of iocs) {

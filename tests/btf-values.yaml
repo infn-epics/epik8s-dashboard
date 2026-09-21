@@ -429,7 +429,8 @@ epicsConfiguration:
       disable: false ## dont deploy
 
   iocs:
-    - name: "btfcamerastest"
+    btfcamerastest:
+      name: "btfcamerastest"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "BTF:CAM"
       autosync: false ## restart automatically on changes
@@ -468,7 +469,8 @@ epicsConfiguration:
             - name: "pxcal"
               value: 33.33
               
-    - name: "btfcameras"
+    btfcameras:
+      name: "btfcameras"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "BTF:CAM"
       autosync: false ## restart automatically on changes
@@ -513,7 +515,8 @@ epicsConfiguration:
               value: 33.33
         
 
-    - name: "slowcontrol"
+    slowcontrol:
+      name: "slowcontrol"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       charturl: 'https://github.com/infn-epics/ioc-chart.git'
       image: ghcr.io/infn-epics/epics-py-base
@@ -527,7 +530,8 @@ epicsConfiguration:
       start: "/epics/ioc/config/start.sh" ## if your mynewioc has a start.sh this line must be kept
       gitinit: true
 
-    - name: "caenelsfast"
+    caenelsfast:
+      name: "caenelsfast"
       iocprefix: "BTF:MAG:FAST"
       devtype: fastps
       opi: "fastps/fastps.bob"
@@ -539,7 +543,8 @@ epicsConfiguration:
           rangeI: 30
           rampI: 0.2
          
-    - name: "daq"
+    daq:
+      name: "daq"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       charturl: 'https://github.com/infn-epics/ioc-chart.git'
       image: ghcr.io/infn-epics/epics-py-base
@@ -556,7 +561,8 @@ epicsConfiguration:
       devgroup: diag
       autosync: true ## restart automatically on changes
 
-    - name: "tml-motor"
+    tml-motor:
+      name: "tml-motor"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "BTF:TML"
       
@@ -706,7 +712,8 @@ epicsConfiguration:
           jvel: 100
           dhlm: 3398293
 
-    - name: "camerasim"
+    camerasim:
+      name: "camerasim"
       asset: "https://servicedesk.infn.it/secure/ObjectSchema.jspa?id=44&typeId=2748&objectId=126655"
       devtype: camerasim
       template: "adcamera"
@@ -756,7 +763,8 @@ epicsConfiguration:
             value: "10"
 
     
-    - name: "mag-wrapper"
+    mag-wrapper:
+      name: "mag-wrapper"
       asset: "https://confluence.infn.it/display/TESTBEAM/SoftIOC+DEVIL+Wrapper"
       charturl: 'https://baltig.infn.it/epics-containers/ioc-chart.git'
       image: ghcr.io/infn-epics/epics-py-base
@@ -776,7 +784,8 @@ epicsConfiguration:
         - name: "memcached_server"
           value: "192.168.198.20"
 
-    - name: "unimag"
+    unimag:
+      name: "unimag"
       asset: "https://confluence.infn.it/display/TESTBEAM/SoftIOC+DEVIL+Wrapper"
       charturl: 'https://baltig.infn.it/epics-containers/ioc-chart.git'
       image: ghcr.io/infn-epics/epics-py-base
@@ -793,7 +802,8 @@ epicsConfiguration:
           value: "1"
       opi: "unimag"
 
-    - name: "ocem-dvl644-ser23001"
+    ocem-dvl644-ser23001:
+      name: "ocem-dvl644-ser23001"
       iocprefix: "DAFNE:ACC:MAG:OCEME642"
       template: "ocem"
       zones: SICUREZZE
@@ -838,7 +848,8 @@ epicsConfiguration:
     #       imax: 650
     #       vmax: 40
 
-    - name: "ocem-dvl655-ser23015"
+    ocem-dvl655-ser23015:
+      name: "ocem-dvl655-ser23015"
       iocprefix: "DAFNE:TL:MAG:OCEME642"
       template: "ocem"
       zones: SICUREZZE
@@ -854,7 +865,8 @@ epicsConfiguration:
           imax: 700
           vmax: 40
 
-    - name: "ocem-dvl652-ser23010"
+    ocem-dvl652-ser23010:
+      name: "ocem-dvl652-ser23010"
       iocprefix: "DAFNE:TL:MAG:OCEME642"
       template: "ocem"
       zones: SICUREZZE
@@ -870,7 +882,8 @@ epicsConfiguration:
           imax: 280
           vmax: 40
 
-    - name: "ocem-dvl624-ser18111"
+    ocem-dvl624-ser18111:
+      name: "ocem-dvl624-ser18111"
       iocprefix: "DAFNE:TL:MAG:OCEME642"
       template: "ocem"
       zones: MAINTL
@@ -896,7 +909,8 @@ epicsConfiguration:
           vmax: 40
         
 
-    - name: "ocem-MEA-e642"
+    ocem-MEA-e642:
+      name: "ocem-MEA-e642"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "BTF:MAG:OCEME642"
       template: "ocem"
@@ -917,7 +931,8 @@ epicsConfiguration:
           imax: 280
           vmax: 40
 
-    - name: "danfysik-SSER15003"
+    danfysik-SSER15003:
+      name: "danfysik-SSER15003"
       iocprefix: "BTF:MAG:DANFYSIK"
       template: "danfysik"
       zones: TM
@@ -941,7 +956,8 @@ epicsConfiguration:
         #   vmax: 25
         
 
-    - name: "ocem-e642-dvl647-SER15001"
+    ocem-e642-dvl647-SER15001:
+      name: "ocem-e642-dvl647-SER15001"
       asset: "https://confluence.infn.it/spaces/TESTBEAM/pages/323780659/SoftIOC+DEVIL+Wrapper"
       iocprefix: "BTF:MAG:OCEME642"
       template: "ocem"
@@ -970,7 +986,8 @@ epicsConfiguration:
           vmax: 25
           
 
-    - name: "ocem-e642-dvl628-SER18004"
+    ocem-e642-dvl628-SER18004:
+      name: "ocem-e642-dvl628-SER18004"
       asset: "https://confluence.infn.it/spaces/TESTBEAM/pages/323780659/SoftIOC+DEVIL+Wrapper"
       iocprefix: "BTF:MAG:OCEME642"
       template: "ocem"
@@ -994,7 +1011,8 @@ epicsConfiguration:
           imax: 700
           vmax: 70
           
-    - name: "maccaferri-dvl654-SER23013"
+    maccaferri-dvl654-SER23013:
+      name: "maccaferri-dvl654-SER23013"
       asset: "https://confluence.infn.it/spaces/TESTBEAM/pages/323780659/SoftIOC+DEVIL+Wrapper"
       iocprefix: "BTF:MAG:MACCAFERRI"
       template: "maccaferriPS"
@@ -1011,7 +1029,8 @@ epicsConfiguration:
           vmax: 100
     
 
-    - name: "ocem-e642-dvl672-23020"
+    ocem-e642-dvl672-23020:
+      name: "ocem-e642-dvl672-23020"
       asset: "https://confluence.infn.it/spaces/TESTBEAM/pages/323780659/SoftIOC+DEVIL+Wrapper"
       iocprefix: "BTF:MAG:OCEME642"
       template: "ocem"
@@ -1279,7 +1298,8 @@ epicsConfiguration:
     # NOT INSTALLED YET
     
     #telecamere linac test end
-    - name: "ocem-e642-dvl650-SER15004"
+    ocem-e642-dvl650-SER15004:
+      name: "ocem-e642-dvl650-SER15004"
       asset: "https://confluence.infn.it/spaces/TESTBEAM/pages/323780659/SoftIOC+DEVIL+Wrapper"
       iocprefix: "BTF:MAG:OCEME642"
       template: "ocem"
@@ -1301,7 +1321,8 @@ epicsConfiguration:
   
      
 
-    - name: "eeips-dvl671"
+    eeips-dvl671:
+      name: "eeips-dvl671"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "BTF:MAG:EEI"
       template: "psEEI"
@@ -1369,7 +1390,8 @@ epicsConfiguration:
             - TB
 
 
-    - name: "ngps-linac"
+    ngps-linac:
+      name: "ngps-linac"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "LINAC:MAG:FAST"
       devtype: fastps
@@ -1392,7 +1414,8 @@ epicsConfiguration:
           rangeI: 10
           port: 10001
 
-    - name: "easy-linac"
+    easy-linac:
+      name: "easy-linac"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "LINAC:MAG:EASY"
       opi: "easydriver/easydriver-main.bob"
@@ -1470,7 +1493,8 @@ epicsConfiguration:
           port: 10001
           
 
-    - name: "easydriver"
+    easydriver:
+      name: "easydriver"
       asset: "https://confluence.infn.it/x/nYD8DQ"
       iocprefix: "BTF:MAG:EASY"
       opi: "easydriver/easydriver-main.bob"

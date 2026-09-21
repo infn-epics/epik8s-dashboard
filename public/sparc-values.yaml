@@ -575,7 +575,8 @@ epicsConfiguration:
         create: false
         name: default
   iocs:
-    - name: beamline-controller
+    beamline-controller:
+      name: beamline-controller
       ioc_version: latest
       iocprefix: SPARC:CONTROL
       devtype: softioc
@@ -611,7 +612,8 @@ epicsConfiguration:
       start: |
             env | grep IOCMNG;iocmng-server
 
-    - name: bergoz-turbobcm
+    bergoz-turbobcm:
+      name: bergoz-turbobcm
       template: bergoz-bcm
       iocprefix: SPARC:DIAG:TURBOBCM
       server: 192.168.197.24 ## plsparcenea
@@ -619,7 +621,8 @@ epicsConfiguration:
       devgroup: diag
       devtype: bcm
 
-    - name: llrfs01
+    llrfs01:
+      name: llrfs01
       template: libera-llrf
       iocprefix: SPARC:LLRF1
       host: plsparcllrfs001.lnf.infn.it
@@ -629,7 +632,8 @@ epicsConfiguration:
           channel: 3
         - name: ad2
           channel: 4
-    - name: llrfs02
+    llrfs02:
+      name: llrfs02
       template: libera-llrf
       iocprefix: SPARC:LLRF2
       host: plsparcllrfs002.lnf.infn.it
@@ -639,7 +643,8 @@ epicsConfiguration:
           channel: 3
         - name: ad2
           channel: 4
-    - name: llrfc01
+    llrfc01:
+      name: llrfc01
       template: libera-llrf
       iocprefix: SPARC:LLRF3
       host: plsparcllrfc001.lnf.infn.it
@@ -649,7 +654,8 @@ epicsConfiguration:
           channel: 3
         - name: ad2
           channel: 4
-    - name: llrfs03
+    llrfs03:
+      name: llrfs03
       template: libera-llrf
       iocprefix: SPARC:LLRFS
       host: plsparcllrfs003.lnf.infn.it
@@ -660,13 +666,15 @@ epicsConfiguration:
           channel: 3
         - name: ad2
           channel: 4
-    - name: orbit
+    orbit:
+      name: orbit
       iocprefix: SPARC:ORBIT
       iocdir: collector
       devtype: softioc
       devgroup: diag
       start: /epics/ioc/config/start.sh
-    - name: klyloop-s1
+    klyloop-s1:
+      name: klyloop-s1
       iocprefix: SPARC:KLYLOOP_S1
       iocdir: klyloop
       iocparam:
@@ -680,7 +688,8 @@ epicsConfiguration:
           value: "9000"
       devtype: softioc
       devgroup: rf
-    - name: ioc-time-profile
+    ioc-time-profile:
+      name: ioc-time-profile
       iocprefix: SPARC:TIM
       iocdir: ioc-time-profile
       devtype: softioc
@@ -696,7 +705,8 @@ epicsConfiguration:
           pv: SPARC:LLRF2:ad1:ch2:phase_average_s.AVERAGE
         - name: llrf3
           pv: SPARC:LLRF3:ad1:ch2:phase_average_s.AVERAGE
-    - name: profile-sync-test
+    profile-sync-test:
+      name: profile-sync-test
       iocprefix: SPARC:TIM
       iocdir: ioc-time-profile
       devtype: softioc
@@ -712,7 +722,8 @@ epicsConfiguration:
           pv: SPARC:CAM:SBN00:image1:ArrayData
         - name: llrf1
           pv: SPARC:LLRF1:ad1:ph_shift:ch1:phase_average_s.AVERAGE
-    - name: klyloop-s2
+    klyloop-s2:
+      name: klyloop-s2
       iocprefix: SPARC:KLYLOOP_S2
       iocdir: klyloop
       iocparam:
@@ -726,7 +737,8 @@ epicsConfiguration:
           value: "9000"
       devtype: softioc
       devgroup: rf
-    - name: lasersynch-01
+    lasersynch-01:
+      name: lasersynch-01
       iocprefix: SPARC:RF:SYNCH:VITARA01
       iocdir: lasersynch
       iocparam:
@@ -738,7 +750,8 @@ epicsConfiguration:
           value: SPARC:LLRF2:ad1:ch2:amp_average_s.AVERAGE
       devtype: softioc
       devgroup: rf
-    - name: rf-conditioning-gun
+    rf-conditioning-gun:
+      name: rf-conditioning-gun
       iocprefix: SPARC:RF:CONDITIONING01
       iocdir: rf-conditioning
       pump:
@@ -801,7 +814,8 @@ epicsConfiguration:
           value: "5"
       devtype: softioc
       devgroup: rf
-    - name: rf-conditioning-s2
+    rf-conditioning-s2:
+      name: rf-conditioning-s2
       iocprefix: SPARC:RF:CONDITIONING02
       iocdir: rf-conditioning
       pump:
@@ -864,7 +878,8 @@ epicsConfiguration:
           value: "5"
       devtype: softioc
       devgroup: rf
-    - name: rf-conditioning-c1
+    rf-conditioning-c1:
+      name: rf-conditioning-c1
       iocprefix: SPARC:RF:CONDITIONING03
       iocdir: rf-conditioning
       pump:
@@ -939,7 +954,8 @@ epicsConfiguration:
           value: "5"
       devtype: softioc
       devgroup: rf
-    - name: ac1bpm01
+    ac1bpm01:
+      name: ac1bpm01
       template: libera-sppp
       iocprefix: AC1BPM01
       host: bdsparcac1bpm001.lnf.infn.it
@@ -964,7 +980,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "300"
-    - name: ac2bpm01
+    ac2bpm01:
+      name: ac2bpm01
       template: libera-sppp
       iocprefix: AC2BPM01
       host: bdsparcac2bpm001.lnf.infn.it
@@ -989,7 +1006,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "300"
-    - name: ac3bpm01
+    ac3bpm01:
+      name: ac3bpm01
       template: libera-sppp
       iocprefix: AC3BPM01
       host: bdsparcac3bpm001.lnf.infn.it
@@ -1014,7 +1032,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "300"
-    - name: ptlbpm01
+    ptlbpm01:
+      name: ptlbpm01
       template: libera-sppp
       iocprefix: PTLBPM01
       host: bdsparcptlbpm001.lnf.infn.it
@@ -1039,7 +1058,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "300"
-    - name: sbnbpm01
+    sbnbpm01:
+      name: sbnbpm01
       template: libera-sppp
       iocprefix: SBNBPM01
       host: bdsparcdglbpm001.lnf.infn.it
@@ -1060,7 +1080,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "500"
-    - name: sbnbpm02
+    sbnbpm02:
+      name: sbnbpm02
       template: libera-sppp
       iocprefix: SBNBPM02
       host: bdsparcdglbpm002.lnf.infn.it
@@ -1081,7 +1102,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "500"
-    - name: sbnbpm03
+    sbnbpm03:
+      name: sbnbpm03
       template: libera-sppp
       iocprefix: SBNBPM03
       host: bdsparcdglbpm003.lnf.infn.it
@@ -1102,7 +1124,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "500"
-    - name: sbnbpm004
+    sbnbpm004:
+      name: sbnbpm004
       template: libera-sppp
       iocprefix: SBNBPM04
       host: bdsparcplxbpm003.lnf.infn.it
@@ -1123,7 +1146,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "500"
-    - name: sbnbpm05
+    sbnbpm05:
+      name: sbnbpm05
       template: libera-sppp
       iocprefix: SBNBPM05
       host: bdsparcplxbpm004.lnf.infn.it
@@ -1144,7 +1168,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "500"
-    - name: sbnbpm06
+    sbnbpm06:
+      name: sbnbpm06
       template: libera-sppp
       iocprefix: SBNBPM06
       host: bdsparcplxbpm006.lnf.infn.it
@@ -1165,7 +1190,8 @@ epicsConfiguration:
           value: "10000000"
         - name: ENV:ENV_ADCSP_THRESHOLD_SP
           value: "500"
-    - name: sparctemp00
+    sparctemp00:
+      name: sparctemp00
       asset: https://confluence.infn.it/display/LDCG/ICP-23-0032
       iocprefix: SPARC:TEMP
       iocroot: ICP
@@ -1212,7 +1238,8 @@ epicsConfiguration:
           lolo: 5
           hihi: 90
       devtype: icp7215
-    - name: sparctempsld
+    sparctempsld:
+      name: sparctempsld
       asset: ""
       iocprefix: SPARC:TEMP
       iocroot: ICP05
@@ -1245,7 +1272,8 @@ epicsConfiguration:
           lolo: 5
           hihi: 90
       devtype: icp7215
-    - name: tektronix
+    tektronix:
+      name: tektronix
       iocprefix: SPARC:DIAG:TEK-TEST
       template: tektronix
       autosync: true
@@ -1281,7 +1309,8 @@ epicsConfiguration:
         - name: CH8
           channel: 8
           devtype: channel
-    - name: tektronix-bcm
+    tektronix-bcm:
+      name: tektronix-bcm
       iocprefix: SPARC:DIAG:TEK-BCM
       template: tektronix
       autosync: true
@@ -1386,7 +1415,8 @@ epicsConfiguration:
           prec: "6"
           scan: 1 second
           desc: Daily charge accumulator LRSDIODE
-    - name: hv-plasma
+    hv-plasma:
+      name: hv-plasma
       asset: https://servicedesk.infn.it/secure/ObjectSchema.jspa?id=32&typeId=1444&objectId=129573
       iocprefix: SPARC:HV
       iocroot: ICP
@@ -1403,7 +1433,8 @@ epicsConfiguration:
         - name: PLASWT01
           devtype: ao
           channel: 1
-    - name: shutter
+    shutter:
+      name: shutter
       asset: https://confluence.infn.it/display/LDCG/ICP-23-0032
       iocprefix: SPARC:SHT
       iocroot: ICP
@@ -1444,7 +1475,8 @@ epicsConfiguration:
         - name: RCMBLAS03
           devtype: di
           channel: 4
-    - name: deflettori
+    deflettori:
+      name: deflettori
       asset: https://servicedesk.infn.it/secure/ObjectSchema.jspa?id=32&typeId=1444&objectId=138748
       iocprefix: SPARC:RFD
       iocroot: ICP
@@ -1473,28 +1505,32 @@ epicsConfiguration:
         - name: RDEFDIR
           devtype: di
           channel: 0
-    - name: undulator3
+    undulator3:
+      name: undulator3
       iocprefix: SPARC:SBN
       iocroot: UND03
       devtype: kima
       iocparam:
         - name: server
           value: gdsbsund003.lnf.infn.it
-    - name: undulator2
+    undulator2:
+      name: undulator2
       iocprefix: SPARC:SBN
       iocroot: UND02
       devtype: kima
       iocparam:
         - name: server
           value: gdsbsund002.lnf.infn.it
-    - name: undulator1
+    undulator1:
+      name: undulator1
       iocprefix: SPARC:SBN
       iocroot: UND01
       devtype: kima
       iocparam:
         - name: server
           value: gdsbsund001.lnf.infn.it
-    - name: chiller-smc
+    chiller-smc:
+      name: chiller-smc
       asset: https://confluence.infn.it/display/LDCG/ICP-23-0032
       charturl: https://github.com/infn-epics/ioc-chart.git
       template: smc
@@ -1572,7 +1608,8 @@ epicsConfiguration:
           iocinit:
             - name: TEMP_SETPT_SP
               value: 44.5
-    - name: vgc-gun
+    vgc-gun:
+      name: vgc-gun
       iocprefix: SPARC:VAC:GUNVGC
       template: pfeiffer-tpg
       zones: LINAC
@@ -1585,7 +1622,8 @@ epicsConfiguration:
         - name: GUNVGA01
           channel: A1
           interlock: true
-    - name: vgc-ac1
+    vgc-ac1:
+      name: vgc-ac1
       iocprefix: SPARC:VAC:AC1VGC
       template: pfeiffer-tpg
       zones:
@@ -1599,7 +1637,8 @@ epicsConfiguration:
       devices:
         - name: AC1VGA01
           channel: B1
-    - name: vgc-ac3
+    vgc-ac3:
+      name: vgc-ac3
       iocprefix: SPARC:VAC:AC3VGC
       template: pfeiffer-tpg
       zones:
@@ -1617,7 +1656,8 @@ epicsConfiguration:
         - name: AC3VGA02
           channel: A2
           interlock: true
-    - name: vgc-cmb
+    vgc-cmb:
+      name: vgc-cmb
       iocprefix: SPARC:VAC:CMBVGC
       template: pfeiffer-tpg
       zones: COMB
@@ -1629,7 +1669,8 @@ epicsConfiguration:
       devices:
         - name: CMBVGA01
           channel: A1
-    - name: vgc-ptl
+    vgc-ptl:
+      name: vgc-ptl
       iocprefix: SPARC:VAC:PTLVGC
       template: pfeiffer-tpg
       zones:
@@ -1645,7 +1686,8 @@ epicsConfiguration:
           channel: A1
         - name: PTLVGA02
           channel: A2
-    - name: vgc-vga03
+    vgc-vga03:
+      name: vgc-vga03
       iocprefix: SPARC:VAC:AC3VGC
       template: pfeiffer-tpg
       zones:
@@ -1659,7 +1701,8 @@ epicsConfiguration:
       devices:
         - name: AC3VGA03
           channel: B1
-    - name: vac-ptlvpc
+    vac-ptlvpc:
+      name: vac-ptlvpc
       iocprefix: SPARC:VAC
       iocroot: PTLVPC
       template: agilent-vac
@@ -1679,7 +1722,8 @@ epicsConfiguration:
         - name: PTLSIP02
           channel: 135
           zones: PTL
-    - name: vac-gac1vpc
+    vac-gac1vpc:
+      name: vac-gac1vpc
       iocprefix: SPARC:VAC
       iocroot: GACVPC
       template: agilent-vac
@@ -1698,7 +1742,8 @@ epicsConfiguration:
           channel: 143
         - name: AC2SIP01
           channel: 144
-    - name: vac-gunvpc
+    vac-gunvpc:
+      name: vac-gunvpc
       iocprefix: SPARC:VAC
       iocroot: GUNVPC
       template: agilent-vac
@@ -1719,7 +1764,8 @@ epicsConfiguration:
           channel: 147
         - name: GUNNEG01
           channel: 148
-    - name: vac-kly02vpc
+    vac-kly02vpc:
+      name: vac-kly02vpc
       iocprefix: SPARC:VAC
       iocroot: KLY2VPC
       template: agilent-vac
@@ -1744,7 +1790,8 @@ epicsConfiguration:
         - name: W2BSIP01
           channel: 152
           interlock: true
-    - name: vac-kly01vpc
+    vac-kly01vpc:
+      name: vac-kly01vpc
       iocprefix: SPARC:VAC
       iocroot: KLY1VPC
       template: agilent-vac
@@ -1766,7 +1813,8 @@ epicsConfiguration:
         - name: W1DSIP01
           channel: 155
           interlock: true
-    - name: vac-kly1-2vpc
+    vac-kly1-2vpc:
+      name: vac-kly1-2vpc
       iocprefix: SPARC:VAC
       iocroot: KLY12VPC
       template: agilent-vac
@@ -1799,7 +1847,8 @@ epicsConfiguration:
           channel: 134
           interlock: true
           zones: KLY2
-    - name: vac-klyc1vpc
+    vac-klyc1vpc:
+      name: vac-klyc1vpc
       iocprefix: SPARC:VAC
       iocroot: KLYCVPC
       template: agilent-vac
@@ -1821,7 +1870,8 @@ epicsConfiguration:
           channel: 131
         - name: WCSIP03
           channel: 132
-    - name: vac-klyc02vpc
+    vac-klyc02vpc:
+      name: vac-klyc02vpc
       iocprefix: SPARC:VAC
       iocroot: KLYC2VPC
       template: agilent-vac
@@ -1844,7 +1894,8 @@ epicsConfiguration:
         - name: WCSIP06
           channel: 134
           interlock: true
-    - name: vac-klcvpc
+    vac-klcvpc:
+      name: vac-klcvpc
       iocprefix: SPARC:VAC
       iocroot: KLCTVPC
       template: agilent-vac
@@ -1862,7 +1913,8 @@ epicsConfiguration:
         - name: BOCSIP01
           channel: 138
           interlock: true
-    - name: vac-ac3vpc
+    vac-ac3vpc:
+      name: vac-ac3vpc
       iocprefix: SPARC:VAC
       iocroot: AC3VPC
       template: agilent-vac
@@ -1883,7 +1935,8 @@ epicsConfiguration:
           channel: 139
         - name: AC3SIP04
           channel: 140
-    - name: vac-exnvpc
+    vac-exnvpc:
+      name: vac-exnvpc
       iocprefix: SPARC:VAC
       iocroot: EXNVPC
       template: agilent-vac
@@ -1902,7 +1955,8 @@ epicsConfiguration:
           channel: 131
         - name: EXNSIP04
           channel: 132
-    - name: vac-sbnvpc
+    vac-sbnvpc:
+      name: vac-sbnvpc
       iocprefix: SPARC:VAC
       iocroot: SBNVPC
       template: agilent-vac
@@ -1924,7 +1978,8 @@ epicsConfiguration:
           zones:
             - WAVEGUIDE
             - KLY2
-    - name: mrf01
+    mrf01:
+      name: mrf01
       asset: https://confluence.infn.it/x/nYD8DQ
       charturl: https://github.com/infn-epics/ioc-chart.git
       template: mrf-utca-300
@@ -2215,7 +2270,8 @@ epicsConfiguration:
               value: Pulser 2
             - name: OutFPUV3Label-I
               value: tunnel
-    - name: vitara
+    vitara:
+      name: vitara
       asset: Vitara RF SPARC
       template: motor
       devtype: newport
@@ -2236,7 +2292,8 @@ epicsConfiguration:
           home: 1
           start: 10
           velo: 1
-    - name: vitara-flame
+    vitara-flame:
+      name: vitara-flame
       asset: https://servicedesk.infn.it/secure/ObjectSchema.jspa?id=32&typeId=1767&objectId=129698
       template: motor
       devtype: newport
@@ -2257,7 +2314,8 @@ epicsConfiguration:
           home: 1
           start: 10
           velo: 1
-    - name: tml-test
+    tml-test:
+      name: tml-test
       devtype: technosoft-asyn
       template: motor
       zones: LINAC
@@ -2297,7 +2355,8 @@ epicsConfiguration:
               value: 688640
             - name: mirror
               value: 1688320
-    - name: tml-ch1
+    tml-ch1:
+      name: tml-ch1
       template: motor
       zones: LINAC
       iocprefix: SPARC:MOT:TML
@@ -2409,7 +2468,8 @@ epicsConfiguration:
               value: 2825310
             - name: calibration
               value: 2264680
-    - name: tml-ch2
+    tml-ch2:
+      name: tml-ch2
       image: ghcr.io/infn-epics/infn-epics-ioc-runtime
       template: motor
       iocprefix: SPARC:MOT:TML
@@ -2509,7 +2569,8 @@ epicsConfiguration:
         - name: CMBTHR01
           axid: 10
           zones: ADVANCED
-    - name: tml-ch3
+    tml-ch3:
+      name: tml-ch3
       template: motor
       iocprefix: SPARC:MOT:TML
       zones: RF
@@ -2542,7 +2603,8 @@ epicsConfiguration:
           name: RFDATT01
         - axid: 8
           name: RFDPHS01
-    - name: pollux-enea
+    pollux-enea:
+      name: pollux-enea
       asset: ""
       charturl: https://github.com/infn-epics/ioc-chart.git
       template: motor
@@ -2632,7 +2694,8 @@ epicsConfiguration:
               value: 2.7
         - name: FELFLG06B
           axid: 12
-    - name: rdsparcpitaia001
+    rdsparcpitaia001:
+      name: rdsparcpitaia001
       devtype: STEMlab125
       iocprefix: SR00RPA01
       host: rdsparcpitaya001.lnf.infn.it
@@ -2660,7 +2723,8 @@ epicsConfiguration:
           value: "0.7845"
         - name: OUT2_OFFSET_SP
           value: "-0.067"
-    - name: rdsparcpitaia002
+    rdsparcpitaia002:
+      name: rdsparcpitaia002
       devtype: STEMlab125
       iocprefix: SR00RPA02
       iocinit:
@@ -2688,7 +2752,8 @@ epicsConfiguration:
           value: "0.1996"
       host: rdsparcpitaya002.lnf.infn.it
       workdir: sparc
-    - name: rdsparcpitaia003
+    rdsparcpitaia003:
+      name: rdsparcpitaia003
       devtype: STEMlab125
       iocprefix: SR00RPA03
       iocinit:
@@ -2712,7 +2777,8 @@ epicsConfiguration:
           value: "1"
       host: rdsparcpitaya003.lnf.infn.it
       workdir: sparc
-    - name: rdsparcpitaia004
+    rdsparcpitaia004:
+      name: rdsparcpitaia004
       devtype: STEMlab125
       iocprefix: SR00RPA04
       iocinit:
@@ -2740,7 +2806,8 @@ epicsConfiguration:
           value: "-0.2"
       host: rdsparcpitaya004.lnf.infn.it
       workdir: sparc
-    - name: rdsparcpitaia006
+    rdsparcpitaia006:
+      name: rdsparcpitaia006
       devtype: STEMlab125
       iocprefix: SR00RPA06
       iocinit:
@@ -2768,7 +2835,8 @@ epicsConfiguration:
           value: "0.2"
       host: rdsparcpitaya006.lnf.infn.it
       workdir: sparc
-    - name: rdsparcpitaia007
+    rdsparcpitaia007:
+      name: rdsparcpitaia007
       devtype: STEMlab125
       iocprefix: SR00RPA07
       iocinit:
@@ -2793,7 +2861,8 @@ epicsConfiguration:
       host: rdsparcpitaya007.lnf.infn.it
       workdir: sparc
       autosync: false
-    - name: camerasim
+    camerasim:
+      name: camerasim
       asset: https://servicedesk.infn.it/secure/ObjectSchema.jspa?id=44&typeId=2748&objectId=126655
       image: ghcr.io/infn-epics/infn-epics-ioc-runtime:latest
       devtype: camerasim
@@ -2842,7 +2911,8 @@ epicsConfiguration:
               value: "50"
             - name: PeakVariation
               value: "10"
-    - name: accameras
+    accameras:
+      name: accameras
       pva: true
       iocprefix: SPARC:CAM
       template: adcamera
@@ -2894,7 +2964,8 @@ epicsConfiguration:
               value: "1"
             - name: pxcal
               value: 34.78
-    - name: eoscameras
+    eoscameras:
+      name: eoscameras
       pva: true
       iocprefix: SPARC:CAM
       template: adcamera
@@ -2936,7 +3007,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 9
-    - name: plvcameras
+    plvcameras:
+      name: plvcameras
       pva: true
       template: adcamera
       iocprefix: SPARC:CAM
@@ -2978,7 +3050,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 100
-    - name: gunthvcameras
+    gunthvcameras:
+      name: gunthvcameras
       pva: true
       template: adcamera
       iocprefix: SPARC:CAM
@@ -3020,7 +3093,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 35.21
-    - name: utlcameras
+    utlcameras:
+      name: utlcameras
       pva: true
       template: adcamera
       iocprefix: SPARC:CAM
@@ -3056,7 +3130,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 28.57
-    - name: sbncameras
+    sbncameras:
+      name: sbncameras
       pva: true
       template: adcamera
       iocprefix: SPARC:CAM
@@ -3100,7 +3175,8 @@ epicsConfiguration:
               value: "1"
             - name: pxcal
               value: 37.73
-    - name: lasercameras
+    lasercameras:
+      name: lasercameras
       pva: true
       iocprefix: SPARC:CAM
       template: adcamera
@@ -3148,7 +3224,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 16.67
-    - name: felcameras
+    felcameras:
+      name: felcameras
       pva: true
       iocprefix: SPARC:CAM
       template: adcamera
@@ -3196,7 +3273,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 1
-    - name: felcameras2
+    felcameras2:
+      name: felcameras2
       pva: true
       iocprefix: SPARC:CAM
       template: adcamera
@@ -3244,7 +3322,8 @@ epicsConfiguration:
           iocinit:
             - name: pxcal
               value: 1
-    - name: haz-ser-ch1
+    haz-ser-ch1:
+      name: haz-ser-ch1
       iocprefix: SPARC:MAG:HZ
       iocparam:
         - name: server
@@ -3266,7 +3345,8 @@ epicsConfiguration:
           id: "8"
           imax: "200"
           vmax: "110"
-    - name: haz-ser-ch4
+    haz-ser-ch4:
+      name: haz-ser-ch4
       iocprefix: SPARC:MAG:HZ
       iocparam:
         - name: server
@@ -3284,7 +3364,8 @@ epicsConfiguration:
           id: "10"
           imax: "200"
           vmax: "110"
-    - name: haz-ser-ch5
+    haz-ser-ch5:
+      name: haz-ser-ch5
       iocprefix: SPARC:MAG:HZ
       iocparam:
         - name: server
@@ -3298,7 +3379,8 @@ epicsConfiguration:
           id: "12"
           imax: "200"
           vmax: "110"
-    - name: haz-ser-ch3
+    haz-ser-ch3:
+      name: haz-ser-ch3
       iocprefix: SPARC:MAG:HZ
       iocparam:
         - name: server
@@ -3316,7 +3398,8 @@ epicsConfiguration:
           id: "14"
           imax: "200"
           vmax: "110"
-    - name: haz-ser-ch2
+    haz-ser-ch2:
+      name: haz-ser-ch2
       iocprefix: SPARC:MAG:HZ
       iocparam:
         - name: server
@@ -3330,7 +3413,8 @@ epicsConfiguration:
           id: "15"
           imax: "200"
           vmax: "110"
-    - name: haz-tcp-SBN401
+    haz-tcp-SBN401:
+      name: haz-tcp-SBN401
       asset: https://confluence.infn.it/
       image: ghcr.io/infn-epics/infn-epics-ioc-runtime:v25.11.13b1
       iocprefix: SPARC:MAG:HZ
@@ -3353,7 +3437,8 @@ epicsConfiguration:
           ip: 192.168.0.117
         - name: SBNQUA07
           ip: 192.168.0.119
-    - name: easydriver
+    easydriver:
+      name: easydriver
       iocprefix: SPARC:MAG:EASY
       networks:
         - name: control
@@ -3405,7 +3490,8 @@ epicsConfiguration:
           range: 10
       devtype: easydriver
       template: caenels
-    - name: caenelsfast
+    caenelsfast:
+      name: caenelsfast
       iocprefix: SPARC:MAG:FAST
       devtype: fastps
       opi: fastps/fastps.bob
@@ -3424,7 +3510,8 @@ epicsConfiguration:
         - name: PTLQUA03
           ip: 192.168.0.123
           rangeI: 10
-    - name: histar
+    histar:
+      name: histar
       iocprefix: SPARC:MAG:HISTAR
       zones: LINAC
       template: caenels
@@ -3502,7 +3589,8 @@ epicsConfiguration:
           ip: 192.168.0.26
           range: 30
           zones: PLX
-    - name: TTI-ch1
+    TTI-ch1:
+      name: TTI-ch1
       iocprefix: SPARC:MAG:TTI
       zones: SABINA
       template: TTI
@@ -3516,7 +3604,8 @@ epicsConfiguration:
           port: 4003
         - name: SBNQUA08
           port: 4004
-    - name: TTI-ch2
+    TTI-ch2:
+      name: TTI-ch2
       iocprefix: SPARC:MAG:TTI
       template: TTI
       server: plsparcmaglink0101.lnf.infn.it
@@ -3530,7 +3619,8 @@ epicsConfiguration:
           port: 4003
         - name: SBNQUA09
           port: 4004
-    - name: ocem-modbus
+    ocem-modbus:
+      name: ocem-modbus
       asset: https://confluence.infn.it/x/nYD8DQ
       charturl: https://github.com/infn-epics/ioc-chart.git
       iocprefix: SPARC:MAG:OCEM
@@ -3579,7 +3669,8 @@ epicsConfiguration:
           imax: 280
           vmax: 16
           zones: SABINA
-    - name: histar-sabina
+    histar-sabina:
+      name: histar-sabina
       iocprefix: SPARC:MAG:HISTAR
       template: caenels
       zones: SABINA
@@ -3623,7 +3714,8 @@ epicsConfiguration:
         - name: SBNHCR07
           ip: 192.168.0.32
           range: 30
-    - name: ppt-mod1
+    ppt-mod1:
+      name: ppt-mod1
       iocprefix: SPARC:MOD:PPT
       template: ppt
       networks:
@@ -3634,7 +3726,8 @@ epicsConfiguration:
           server: 192.168.197.111
           port: 2000
           asset: https://confluence.infn.it/display/LDCG/PPT-MOD-001
-    - name: ppt-mod2
+    ppt-mod2:
+      name: ppt-mod2
       iocprefix: SPARC:MOD:PPT
       template: ppt
       networks:
@@ -3645,7 +3738,8 @@ epicsConfiguration:
           server: 192.168.197.112
           port: 2000
           asset: https://confluence.infn.it/display/LDCG/PPT-MOD-002
-    - name: development-andrea
+    development-andrea:
+      name: development-andrea
       devtype: development
       networks:
         - name: control
@@ -3658,37 +3752,44 @@ epicsConfiguration:
         requests:
           cpu: 500m
           memory: 800Mi
-    - name: development-alessandro
+    development-alessandro:
+      name: development-alessandro
       devtype: development
       networks:
         - name: control
           annotation: sparc-magnets
       ssh_nodeport: 30023
-    - name: development-riccardo
+    development-riccardo:
+      name: development-riccardo
       devtype: development
       networks:
         - name: control
           annotation: sparc-magnets
       ssh_nodeport: 30024
-    - name: development-francesco
+    development-francesco:
+      name: development-francesco
       devtype: development
       networks:
         - name: control
           annotation: sparc-magnets
       ssh_nodeport: 30025
-    - name: development-georgios
+    development-georgios:
+      name: development-georgios
       devtype: development
       networks:
         - name: control
           annotation: sparc-magnets
       ssh_nodeport: 30026
-    - name: development-rf
+    development-rf:
+      name: development-rf
       devtype: development
       ssh_nodeport: 30027
-    - name: development-generic
+    development-generic:
+      name: development-generic
       devtype: development
       ssh_nodeport: 30028
-    - name: development-gpu
+    development-gpu:
+      name: development-gpu
       devtype: development
       ssh_nodeport: 30029
       resources:
@@ -3697,7 +3798,8 @@ epicsConfiguration:
       runon:
         - name: control
           annotation: gpu
-    - name: sbn01
+    sbn01:
+      name: sbn01
       template: adcamera
       devtype: adcamera
       iocprefix: SPARC:CAM
@@ -3716,7 +3818,8 @@ epicsConfiguration:
       stats_enable: true
       tiff_enable: true
       stdarray_enable: false
-    - name: sbncam02
+    sbncam02:
+      name: sbncam02
       template: adcamera
       devtype: adcamera
       iocprefix: SPARC:CAM
@@ -3735,7 +3838,8 @@ epicsConfiguration:
       stats_enable: true
       tiff_enable: true
       stdarray_enable: false
-    - name: sbncam03
+    sbncam03:
+      name: sbncam03
       template: adcamera
       devtype: adcamera
       iocprefix: SPARC:CAM
