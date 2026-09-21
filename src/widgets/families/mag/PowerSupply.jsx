@@ -1,26 +1,6 @@
 import { usePv } from '../../../hooks/usePv.js';
 import { PvDisplay, PvInput } from '../../../components/common/PvControls.jsx';
-
-function resolveEnumChoices(pvMsg) {
-  if (!pvMsg) return [];
-  const c = pvMsg.choices || pvMsg.enumStrings || pvMsg.enum_strs || pvMsg.labels;
-  return Array.isArray(c) ? c : [];
-}
-
-function resolveEnumLabel(pvMsg) {
-  if (!pvMsg) return '---';
-  const direct = pvMsg.display || pvMsg.text || pvMsg.string || pvMsg.str || pvMsg.valueStr;
-  if (typeof direct === 'string' && direct.trim() !== '') return direct;
-
-  const choices = resolveEnumChoices(pvMsg);
-  const raw = pvMsg.value;
-  const idx = typeof raw === 'number' ? raw : parseInt(raw, 10);
-  if (choices.length && Number.isInteger(idx) && idx >= 0 && idx < choices.length) {
-    return String(choices[idx]);
-  }
-
-  return raw !== null && raw !== undefined ? String(raw) : '---';
-}
+import { resolveEnumChoices, resolveEnumLabel, alarmLevel } from '../../../services/pvEnum.js';
 
 const STATE_SP_OPTIONS = ['ON', 'STANDBY', 'RESET'];
 
@@ -46,12 +26,23 @@ export default function PowerSupplyWidget({ config, client }) {
     return fromRb.length ? fromRb.map((v) => String(v).toUpperCase()) : [];
   })();
   const stateRbLabel = resolveEnumLabel(stateRbPv);
+  const stateRbString = stateRbLabel.toUpperCase();
+  const stateRbAlarm = alarmLevel(stateRbPv);
 
   const stateSpString = (() => {
     if (typeof stateSpRaw === 'string') return stateSpRaw.toUpperCase();
     if (Number.isInteger(stateSpRaw) && stateChoices[stateSpRaw]) return stateChoices[stateSpRaw];
     return '';
   })();
+
+  const stateMatched = stateRbString !== '' && stateRbString === stateSpString;
+
+  // Alarm (red/yellow) wins over the green "RB matches SP" box.
+  const buttonBox = (state) => {
+    if (state === stateRbString && stateRbAlarm) return `alarm-${stateRbAlarm}`;
+    if (state === stateSpString) return stateMatched ? 'matched' : 'pending';
+    return '';
+  };
 
   const writeState = (stateCmd) => {
     if (!client || !pvPrefix || !stateCmd) return;
@@ -63,7 +54,9 @@ export default function PowerSupplyWidget({ config, client }) {
       <div className="ps-status-row ps-state-row">
         <span className="pv-display" title={pvPrefix ? `${pvPrefix}:STATE_RB` : 'STATE_RB'}>
           <span className="pv-label">State RB</span>
-          <span className="pv-value">{stateRbLabel}</span>
+          <span className={`pv-value ps-state-rb ${stateRbAlarm ? `alarm-${stateRbAlarm}` : stateMatched ? 'matched' : ''}`}>
+            {stateRbLabel}
+          </span>
         </span>
 
         <div className="pv-input-group" title={pvPrefix ? `${pvPrefix}:STATE_SP` : 'STATE_SP'}>
@@ -73,7 +66,7 @@ export default function PowerSupplyWidget({ config, client }) {
               <button
                 key={state}
                 type="button"
-                className={`widget-action-btn ${stateSpString === state ? 'on' : ''}`}
+                className={`widget-action-btn ${buttonBox(state)}`}
                 onClick={() => writeState(state)}
               >
                 {state}

@@ -4358,6 +4358,42 @@ body,
   font-size: 10px;
 }
 
+/* State boxes: green = STATE_RB matches STATE_SP, red = MAJOR, yellow = MINOR/WARNING.
+   `pending` = SP selected but RB not there yet. */
+.ps-state-buttons .widget-action-btn.pending {
+  border-color: var(--text-dim);
+}
+
+.ps-state-buttons .widget-action-btn.matched,
+.ps-state-rb.matched {
+  background: var(--green);
+  border-color: var(--green);
+  color: #052e1c;
+}
+
+.ps-state-buttons .widget-action-btn.alarm-major,
+.ps-state-rb.alarm-major {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.ps-state-buttons .widget-action-btn.alarm-minor,
+.ps-state-rb.alarm-minor {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: #2b1d00;
+}
+
+.ps-state-rb.matched,
+.ps-state-rb.alarm-major,
+.ps-state-rb.alarm-minor {
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
 .ps-reading {
   display: flex;
   gap: 16px;
