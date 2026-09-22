@@ -10,6 +10,7 @@ import {
   ProcedureFrame, FilePicker, StatusBox, StateCell, DeltaCell, Led, NumberInput,
   useMagnets, fmt,
 } from './MagnetParts.jsx';
+import SaveAndRestoreBrowser from './SaveAndRestoreBrowser.jsx';
 
 const toNumber = (text) => (text.trim() === '' ? NaN : Number(text));
 
@@ -30,6 +31,7 @@ export default function MagnetRestoreView({ simple = false }) {
   const [tolerance, setTolerance] = useState(String(DEFAULT_TOLERANCE));
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState(null);
+  const [sarOpen, setSarOpen] = useState(false);
 
   const tol = simple ? SIMPLE_TOLERANCE
     : Number.isFinite(Number(tolerance)) && tolerance.trim() !== '' && Number(tolerance) >= 0
@@ -65,6 +67,20 @@ export default function MagnetRestoreView({ simple = false }) {
     } catch (err) {
       setMessage({ tone: 'error', text: `Cannot load ${file.name}: ${err.message || err}` });
     }
+  };
+
+  // save-and-restore rows may carry only current or only state (a snapshot commonly holds one
+  // config's worth of PVs, e.g. BTF's separate MAGNET_SP / MAGNET_STATE): '' for sp leaves the
+  // field empty rather than showing the text "null", same as a freshly typed blank value.
+  const loadFromSaveAndRestore = (srRows, skipped, label) => {
+    setRows(srRows.map((r) => ({
+      base: r.base, name: r.name, prefix: r.prefix,
+      sp: r.current === null ? '' : String(r.current), state: r.state, enabled: true,
+    })));
+    setFileName(`save-and-restore: ${label}`);
+    setSarOpen(false);
+    const skippedText = skipped.length ? `   Ignored ${skipped.length} unrelated PV(s).` : '';
+    setMessage({ tone: 'info', text: `Loaded ${srRows.length} devices from "${label}"${skippedText}` });
   };
 
   const view = rows.map((r) => {
@@ -130,6 +146,12 @@ export default function MagnetRestoreView({ simple = false }) {
 
       <div className="mag-proc-toolbar">
         <FilePicker onFile={loadFile} disabled={!!busy} label="Choose snapshot / dataset..." />
+        {!simple && (
+          <button type="button" className="mag-proc-btn" disabled={!!busy} onClick={() => setSarOpen((o) => !o)}
+            title="Browse the save-and-restore service and load a saved snapshot">
+            Load from Save &amp; Restore...
+          </button>
+        )}
         <span className="mag-proc-filename">{fileName || 'no file loaded'}</span>
         <span className="mag-proc-spacer" />
         {!simple && (
@@ -156,6 +178,10 @@ export default function MagnetRestoreView({ simple = false }) {
           {simple ? 'Apply' : 'Restore Selected'}
         </button>
       </div>
+
+      {sarOpen && !simple && (
+        <SaveAndRestoreBrowser onLoad={loadFromSaveAndRestore} onClose={() => setSarOpen(false)} />
+      )}
 
       <StatusBox message={message} busy={busy} />
 

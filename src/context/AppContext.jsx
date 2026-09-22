@@ -3,6 +3,7 @@ import { loadConfig, loadStoredGitConfig, saveGitConfig, clearGitConfig } from '
 import PvwsClient from '../services/pvws.js';
 import ArchiverClient from '../services/archiver.js';
 import { buildChannelFinderUrl, setChannelFinderUrl } from '../services/channelFinderApi.js';
+import { buildSaveAndRestoreUrl, setSaveAndRestoreUrl } from '../services/saveAndRestoreApi.js';
 import { proxyUrl } from '../services/devProxy.js';
 
 const AppContext = createContext(null);
@@ -181,6 +182,9 @@ export function AppProvider({ children }) {
         const cfUrl = buildChannelFinderUrl(result.config);
         if (cfUrl) setChannelFinderUrl(cfUrl);
 
+        const sarUrl = buildSaveAndRestoreUrl(result.config);
+        if (sarUrl) setSaveAndRestoreUrl(sarUrl);
+
         setLoading(false);
       })
       .catch((err) => {
@@ -236,6 +240,9 @@ export function AppProvider({ children }) {
 
     const cfUrl = buildChannelFinderUrl(result.config);
     if (cfUrl) setChannelFinderUrl(cfUrl);
+
+    const sarUrl = buildSaveAndRestoreUrl(result.config);
+    if (sarUrl) setSaveAndRestoreUrl(sarUrl);
 
     return result;
   }, [config]);
