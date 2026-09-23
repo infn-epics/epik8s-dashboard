@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateKeyPair, SignJWT, exportJWK, createLocalJWKSet } from '../k8s-backend/node_modules/jose/dist/node/esm/index.js';
+import { generateKeyPair, SignJWT, exportJWK, createLocalJWKSet } from 'jose';
 import { authorize, requiredCapability, requiredWsCapability, createAuth } from '../k8s-backend/auth.js';
 import { parseGitRepo, allowedPrefixes, isAllowedGitUrl } from '../k8s-backend/git-relay.js';
 
