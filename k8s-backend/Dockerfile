@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
-COPY server.js ./
+COPY server.js auth.js git-relay.js ./
 
 # Run as non-root
 RUN addgroup -g 1001 -S appgroup && \

@@ -34,8 +34,9 @@ export function authorize(claims, capability, beamline) {
   const roles = Array.isArray(claims?.roles) ? claims.roles : [];
   if (roles.includes(CAPABILITY.ADMIN)) return { ok: true };
   if (!roles.includes(capability)) return { ok: false, reason: `missing role ${capability}` };
-  const beamlines = Array.isArray(claims?.beamlines) ? claims.beamlines : [];
-  if (!beamline || !beamlines.includes(beamline)) {
+  // Beamline ids are case-insensitive: the chart's `beamline` value is often upper-case (BTF), the Keycloak group lower-case (btf).
+  const beamlines = (Array.isArray(claims?.beamlines) ? claims.beamlines : []).map(b => String(b).toLowerCase());
+  if (!beamline || !beamlines.includes(String(beamline).toLowerCase())) {
     return { ok: false, reason: `not a member of beamline ${beamline}` };
   }
   return { ok: true };

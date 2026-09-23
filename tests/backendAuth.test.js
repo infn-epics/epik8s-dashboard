@@ -9,6 +9,7 @@ describe('authorize', () => {
   const op = { roles: ['pv.read', 'pv.write'], beamlines: ['btf'] };
   it('allows a role on the user\'s beamline', () => expect(authorize(op, 'pv.read', 'btf').ok).toBe(true));
   it('denies a role the user lacks', () => expect(authorize(op, 'ioc.control', 'btf').ok).toBe(false));
+  it('matches beamline case-insensitively', () => expect(authorize(op, 'pv.read', 'BTF').ok).toBe(true));
   it('denies another beamline', () => expect(authorize(op, 'pv.read', 'sparc').ok).toBe(false));
   it('denies a user with no beamlines / roles (deny by default)', () => {
     expect(authorize({}, 'pv.read', 'btf').ok).toBe(false);
