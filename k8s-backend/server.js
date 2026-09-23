@@ -299,7 +299,8 @@ const GIT_RELAY_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 app.all('/api/v1/git/relay', async (req, res, next) => {
   try {
     if (!GIT_RELAY_METHODS.has(req.method)) return res.status(405).json({ error: 'Method not allowed' });
-    if (!GIT_REPO || !GIT_TOKEN) return res.status(503).json({ error: 'Git relay not configured (GIT_REPO_URL/GIT_TOKEN)' });
+    // No GIT_TOKEN = public repository: reads work anonymously, writes are refused upstream.
+    if (!GIT_REPO) return res.status(503).json({ error: 'Git relay not configured (GIT_REPO_URL)' });
     const targetUrl = req.query.url;
     if (!targetUrl || !isAllowedGitUrl(targetUrl, allowedPrefixes(GIT_REPO))) {
       return res.status(403).json({ error: 'URL is outside the beamline repository' });
