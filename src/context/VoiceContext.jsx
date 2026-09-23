@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useApp } from './AppContext.jsx';
 import VoiceRoomClient from '../services/voiceRoom.js';
+import { resolveVoiceModel } from '../voice/resolveModel.js';
 
 const VoiceContext = createContext(null);
 
@@ -29,6 +30,15 @@ export function VoiceProvider({ children }) {
     return unsub;
   }, []);
 
+  // The model in effect is derived, never written back to state from inside the
+  // connect effect. It used to be: selectedModel starts as '', so the effect
+  // called setSelectedModel(defaultModel), which changed a dependency and
+  // re-ran the effect - connect, disconnect, connect on every page load. Each
+  // connect POSTs /token, and the token service dispatches a voice agent per
+  // request, so one page load started two agents that both answered every
+  // message (the transcript and every tool result appeared twice or more).
+  const model = resolveVoiceModel(voiceConfig?.models, voiceConfig?.defaultModel, selectedModel);
+
   useEffect(() => {
     const client = clientRef.current;
     client.disconnect();
@@ -38,16 +48,11 @@ export function VoiceProvider({ children }) {
     client.serverUrl = voiceConfig.serverUrl;
     client.roomName = voiceConfig.roomName;
     client.identityPrefix = voiceConfig.identityPrefix || 'operator';
-    const configuredModels = voiceConfig.models || [];
-    const defaultModel = voiceConfig.defaultModel || configuredModels[0]?.id || '';
-    const model = configuredModels.some((entry) => entry.id === selectedModel)
-      ? selectedModel : defaultModel;
     client.model = model;
-    if (model !== selectedModel) setSelectedModel(model);
     client.connect();
 
     return () => client.disconnect();
-  }, [voiceConfig?.enabled, voiceConfig?.tokenEndpoint, voiceConfig?.serverUrl, voiceConfig?.roomName, voiceConfig?.identityPrefix, voiceConfig?.defaultModel, voiceConfig?.models, selectedModel]);
+  }, [voiceConfig?.enabled, voiceConfig?.tokenEndpoint, voiceConfig?.serverUrl, voiceConfig?.roomName, voiceConfig?.identityPrefix, model]);
 
   const connect = useCallback(() => clientRef.current.reconnectNow(), []);
   const disconnect = useCallback(() => clientRef.current.disconnect(), []);
@@ -62,7 +67,7 @@ export function VoiceProvider({ children }) {
     enabled: !!voiceConfig?.enabled,
     connect,
     disconnect,
-    selectedModel,
+    selectedModel: model,
     setModel,
   };
 
