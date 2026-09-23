@@ -17,6 +17,7 @@
  * src/voice/events.js (highlight, transcript, confirm_request). Outbound
  * events (confirm_action) are sent via sendData().
  */
+import { getAccessToken } from './oidc.js';
 import { Room, RoomEvent, Track, createLocalAudioTrack } from 'livekit-client';
 import { computeBackoffDelay, MAX_RECONNECT_ATTEMPTS } from '../voice/events.js';
 
@@ -153,11 +154,16 @@ export default class VoiceRoomClient {
 
   async _fetchToken() {
     const identity = `${this.identityPrefix}-${Math.random().toString(36).slice(2, 8)}`;
+    // Keycloak login: the token service authorises on this and hands back the
+    // operator's private room (the server also fixes the identity).
+    const access = getAccessToken();
     const res = await fetch(this.tokenEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(access ? { Authorization: `Bearer ${access}` } : {}) },
       body: JSON.stringify({ room: this.roomName, identity, model: this.model || undefined }),
     });
+    if (res.status === 401) throw new Error('Sign in to use ARGUS voice');
+    if (res.status === 403) throw new Error('Your account is not allowed to use ARGUS on this beamline');
     if (!res.ok) throw new Error(`Token endpoint returned ${res.status}`);
     const body = await res.json();
     if (!body?.token) throw new Error('Token endpoint response missing "token"');

@@ -1,3 +1,4 @@
+import { useAuth } from './AuthContext.jsx';
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { useApp } from './AppContext.jsx';
 import VoiceRoomClient from '../services/voiceRoom.js';
@@ -19,6 +20,10 @@ export function VoiceProvider({ children }) {
   const clientRef = useRef(null);
   const [connectionStatus, setConnectionStatus] = useState('idle');
   const [selectedModel, setSelectedModel] = useState('');
+  // Keycloak mode: the token service needs the login, so wait for it (and
+  // depend on the boolean only - a 5-minute token refresh must not reconnect).
+  const { oidc, isAuthenticated } = useAuth();
+  const authReady = !oidc || isAuthenticated;
 
   if (!clientRef.current) {
     clientRef.current = new VoiceRoomClient({});
@@ -42,7 +47,7 @@ export function VoiceProvider({ children }) {
   useEffect(() => {
     const client = clientRef.current;
     client.disconnect();
-    if (!voiceConfig?.enabled) return undefined;
+    if (!voiceConfig?.enabled || !authReady) return undefined;
 
     client.tokenEndpoint = voiceConfig.tokenEndpoint;
     client.serverUrl = voiceConfig.serverUrl;
@@ -52,7 +57,7 @@ export function VoiceProvider({ children }) {
     client.connect();
 
     return () => client.disconnect();
-  }, [voiceConfig?.enabled, voiceConfig?.tokenEndpoint, voiceConfig?.serverUrl, voiceConfig?.roomName, voiceConfig?.identityPrefix, model]);
+  }, [voiceConfig?.enabled, voiceConfig?.tokenEndpoint, voiceConfig?.serverUrl, voiceConfig?.roomName, voiceConfig?.identityPrefix, model, authReady]);
 
   const connect = useCallback(() => clientRef.current.reconnectNow(), []);
   const disconnect = useCallback(() => clientRef.current.disconnect(), []);
