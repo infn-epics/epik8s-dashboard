@@ -25,7 +25,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { WebSocketServer } from 'ws';
 import { createAuth } from './auth.js';
-import { parseGitRepo, allowedPrefixes, isAllowedGitUrl, gitAuthHeaders } from './git-relay.js';
+import { parseGitRepo, allowedPrefixes, isAllowedGitUrl, gitAuthHeaders, gitHostFetch } from './git-relay.js';
 import { KubeConfig, CoreV1Api, AppsV1Api, CustomObjectsApi, Metrics, Exec, Attach, Log } from '@kubernetes/client-node';
 
 // ─── Config ─────────────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ app.get('/api/v1/git-proxy', async (req, res, next) => {
     const timeout = setTimeout(() => ctrl.abort(), 15000);
     let upstream;
     try {
-      upstream = await fetch(targetUrl, { headers, signal: ctrl.signal });
+      upstream = await gitHostFetch(targetUrl, { headers, signal: ctrl.signal });
     } finally {
       clearTimeout(timeout);
     }
@@ -312,7 +312,7 @@ app.all('/api/v1/git/relay', async (req, res, next) => {
     const timeout = setTimeout(() => ctrl.abort(), 30000);
     let upstream;
     try {
-      upstream = await fetch(targetUrl, {
+      upstream = await gitHostFetch(targetUrl, {
         method: req.method,
         headers,
         body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,

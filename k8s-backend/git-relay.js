@@ -58,3 +58,25 @@ export function gitAuthHeaders(repo, token) {
     ? { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' }
     : { 'PRIVATE-TOKEN': token };
 }
+
+/**
+ * fetch() for Git-host calls. Node 20's built-in fetch ignores HTTPS_PROXY, and
+ * the cluster reaches the Git host only through the site proxy, so route via
+ * undici's ProxyAgent when one is configured (honouring NO_PROXY).
+ */
+import { fetch as undiciFetch, ProxyAgent } from 'undici';
+
+let _agent;
+function bypass(host, noProxy) {
+  return (noProxy || '').split(',').map(s => s.trim()).filter(Boolean).some(p => {
+    const d = p.replace(/^\*?\./, '');
+    return host === d || host.endsWith(`.${d}`);
+  });
+}
+
+export function gitHostFetch(url, init = {}, env = process.env) {
+  const proxy = env.HTTPS_PROXY || env.https_proxy;
+  if (!proxy || bypass(new URL(url).hostname, env.NO_PROXY || env.no_proxy)) return fetch(url, init);
+  _agent ||= new ProxyAgent(proxy);
+  return undiciFetch(url, { ...init, dispatcher: _agent });
+}
