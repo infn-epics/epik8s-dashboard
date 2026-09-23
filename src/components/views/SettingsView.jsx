@@ -15,7 +15,7 @@ export default function SettingsView() {
   const { dataSources, updateDataSources, resetDataSources, gitConfig, updateGitConfig, resetGitConfig } = useApp();
   const {
     user, provider, role, isAuthenticated, repoInfo,
-    login, logout, authError, authLoading,
+    login, logout, authError, authLoading, oidc,
   } = useAuth();
 
   const [pvwsUrl, setPvwsUrl] = useState(dataSources.pvwsUrl);
@@ -195,9 +195,10 @@ export default function SettingsView() {
       <section className="settings-section">
         <h3 className="settings-section-title">🔑 Authentication</h3>
         <p className="settings-section-desc">
-          Provide a Personal Access Token (PAT) for your git platform to enable
-          configuration editing, ticket creation, and role-based access.
-          {repoInfo && (
+          {oidc
+            ? 'Sign in with your EPIK8s account (Keycloak). Your roles and beamlines decide what you can do; Git access is handled by the backend.'
+            : 'Provide a Personal Access Token (PAT) for your git platform to enable configuration editing, ticket creation, and role-based access.'}
+          {!oidc && repoInfo && (
             <> Repository: <strong>{repoInfo.platform === 'github' ? '🐙 GitHub' : '🦊 GitLab'}</strong> — <code>{repoInfo.projectPath}</code> on <code>{repoInfo.host}</code></>
           )}
         </p>
@@ -210,7 +211,8 @@ export default function SettingsView() {
               <div className="settings-auth-info">
                 <span className="settings-auth-name">{user.name}</span>
                 <span className="settings-auth-login">
-                  {provider === 'github' ? '🐙' : '🦊'} @{user.login}
+                  {provider === 'keycloak' ? '🔐' : provider === 'github' ? '🐙' : '🦊'} @{user.login}
+                  {user.beamlines?.length > 0 && <> — beamlines: {user.beamlines.join(', ')}</>}
                 </span>
                 <span className="settings-auth-role" style={{ color: ROLES[role]?.color }}>
                   Role: {ROLES[role]?.label} — {ROLES[role]?.description}
@@ -225,8 +227,17 @@ export default function SettingsView() {
           </div>
         )}
 
+        {/* Keycloak login (replaces the PAT form) */}
+        {!isAuthenticated && oidc && (
+          <div className="settings-field" style={{ marginTop: 12 }}>
+            <button className="settings-btn settings-btn--primary" onClick={() => login()} disabled={authLoading}>
+              {authLoading ? '⟳ Signing in…' : '🔐 Sign in with Keycloak'}
+            </button>
+          </div>
+        )}
+
         {/* PAT login form (when not authenticated) */}
-        {!isAuthenticated && (
+        {!isAuthenticated && !oidc && (
           <div className="settings-field" style={{ marginTop: 12 }}>
             <label className="settings-label" htmlFor="auth-pat">
               {repoInfo?.platform === 'github' ? 'GitHub' : 'GitLab'} Personal Access Token

@@ -152,6 +152,11 @@ export const ROLES = {
     description: 'Control devices, edit dashboards, create tickets',
     color: '#4488ff',
   },
+  expert: {
+    label: 'Expert',
+    description: 'Beamline expert: edit configuration and control IOCs (Keycloak login)',
+    color: '#aa44ff',
+  },
   admin: {
     label: 'Admin',
     description: 'Full access: edit configuration, manage layouts, administer',
@@ -159,7 +164,7 @@ export const ROLES = {
   },
 };
 
-const ROLE_HIERARCHY = ['viewer', 'operator', 'admin'];
+const ROLE_HIERARCHY = ['viewer', 'operator', 'expert', 'admin'];
 
 /**
  * Check if a role has at least the required level.

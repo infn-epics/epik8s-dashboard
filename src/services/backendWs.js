@@ -4,6 +4,7 @@
  * Derives the WS URL from the HTTP backend URL (same host, ws:// or wss://).
  */
 import { getBackendUrl } from './k8sApi.js';
+import { getAccessToken } from './oidc.js';
 
 function wsBaseUrl() {
   const http = getBackendUrl();
@@ -34,7 +35,8 @@ export function createBackendWs(path) {
       return;
     }
     try {
-      ws = new WebSocket(`${base}${path}`);
+      const t = getAccessToken();
+      ws = new WebSocket(`${base}${path}${t ? `?access_token=${encodeURIComponent(t)}` : ''}`);
     } catch {
       reconnectTimer = setTimeout(connect, 3000);
       return;

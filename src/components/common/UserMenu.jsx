@@ -53,7 +53,7 @@ export default function UserMenu() {
           <div className="user-menu-header">
             <div className="user-menu-name">{user.name}</div>
             <div className="user-menu-login-id">
-              {provider === 'github' ? '🐙' : '🦊'} @{user.login}
+              {provider === 'keycloak' ? '🔐' : provider === 'github' ? '🐙' : '🦊'} @{user.login}
             </div>
             <div className="user-menu-role" style={{ color: roleInfo.color }}>
               {roleInfo.label}

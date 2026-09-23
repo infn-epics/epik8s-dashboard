@@ -1,3 +1,5 @@
+import { getAccessToken, oidcActive } from './oidc.js';
+
 /**
  * Dev-mode HTTPS proxy helper.
  *
@@ -78,6 +80,14 @@ export function deriveBackendUrl() {
  * @returns {Promise<Response>}
  */
 export async function gitProxyFetch(rawUrl, token = null) {
+  if (oidcActive()) {
+    const base = deriveBackendUrl();
+    if (base) {
+      return fetch(`${base}/api/v1/git-proxy?url=${encodeURIComponent(rawUrl)}`, {
+        headers: { Accept: 'text/plain, */*', Authorization: `Bearer ${getAccessToken()}` },
+      });
+    }
+  }
   if (Boolean(import.meta?.env?.DEV)) {
     // Dev server: use the Vite proxy middleware
     const proxied = proxyUrl(rawUrl);
@@ -105,4 +115,32 @@ export async function gitProxyFetch(rawUrl, token = null) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return fetch(rawUrl, { headers });
+}
+
+/**
+ * fetch() for Git-host API calls.
+ *
+ * Legacy (PAT) login: unchanged — straight to the Git host (via the dev proxy
+ * on localhost) with the caller's PAT headers.
+ * Keycloak login: the call goes to the backend's /api/v1/git/relay, which adds
+ * the server-held Git credential and refuses anything outside the beamline
+ * repository. The caller's own auth headers are dropped, so neither a PAT nor
+ * the Keycloak token can ever reach the Git host.
+ */
+export async function gitFetch(url, init = {}) {
+  if (!oidcActive()) return fetch(proxyUrl(url), init);
+
+  const backendUrl = deriveBackendUrl();
+  if (!backendUrl) throw new Error('Backend URL not available for Git access');
+  if (init.body != null && typeof init.body !== 'string') {
+    throw new Error('Binary/multipart Git uploads are not supported with Keycloak login');
+  }
+  const headers = { Authorization: `Bearer ${getAccessToken()}` };
+  const ct = new Headers(init.headers || {}).get('Content-Type');
+  if (ct) headers['Content-Type'] = ct;
+  return fetch(`${backendUrl}/api/v1/git/relay?url=${encodeURIComponent(url)}`, {
+    method: init.method || 'GET',
+    headers,
+    body: init.body,
+  });
 }

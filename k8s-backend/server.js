@@ -24,6 +24,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { WebSocketServer } from 'ws';
+import { createAuth } from './auth.js';
+import { parseGitRepo, allowedPrefixes, isAllowedGitUrl, gitAuthHeaders } from './git-relay.js';
 import { KubeConfig, CoreV1Api, AppsV1Api, CustomObjectsApi, Metrics, Exec, Attach, Log } from '@kubernetes/client-node';
 
 // ─── Config ─────────────────────────────────────────────────────────────
@@ -32,6 +34,9 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 const ARGOCD_NAMESPACE = process.env.ARGOCD_NAMESPACE || 'argocd';
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || '*';
 const LOG_LEVEL = process.env.LOG_LEVEL || 'combined';
+// Keycloak login. Unset OIDC_ISSUER => auth is off (legacy behaviour).
+const GIT_REPO = parseGitRepo(process.env.GIT_REPO_URL || '');
+const GIT_TOKEN = process.env.GIT_TOKEN || '';
 
 // Read namespace from downward API or SA token mount
 function detectNamespace() {
@@ -41,6 +46,13 @@ function detectNamespace() {
   return 'default';
 }
 const NAMESPACE = detectNamespace();
+
+const auth = createAuth({
+  issuer: process.env.OIDC_ISSUER,
+  audience: process.env.OIDC_AUDIENCE || 'epik8s-services',
+  jwksUri: process.env.OIDC_JWKS_URI,
+  beamline: process.env.BEAMLINE || NAMESPACE,
+});
 
 // ─── K8s client (in-cluster or kubeconfig) ──────────────────────────────
 
@@ -118,6 +130,9 @@ app.use(express.json());
 // CORS
 const corsOrigins = ALLOWED_ORIGINS === '*' ? '*' : ALLOWED_ORIGINS.split(',').map(s => s.trim());
 app.use(cors({ origin: corsOrigins, credentials: true }));
+if (auth) {
+  app.use((req, res, next) => (req.path.startsWith('/api/') ? auth.middleware(req, res, next) : next()));
+}
 
 // ─── HTTP server (needed for WebSocket upgrade) ─────────────────────────
 
@@ -132,8 +147,13 @@ const podExecWss = new WebSocketServer({ noServer: true });
 const podAttachWss = new WebSocketServer({ noServer: true });
 
 // Route WS upgrade by URL path
-server.on('upgrade', (req, socket, head) => {
+server.on('upgrade', async (req, socket, head) => {
   const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+  if (auth && !(await auth.authorizeUpgrade(req, pathname))) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
   if (pathname === '/ws/chat') {
     chatWss.handleUpgrade(req, socket, head, ws => chatWss.emit('connection', ws, req));
   } else if (pathname === '/ws/system') {
@@ -221,8 +241,16 @@ app.get('/api/v1/git-proxy', async (req, res, next) => {
       return res.status(400).json({ error: 'Only http/https URLs allowed' });
     }
 
-    const token = req.headers['x-git-token'];
     const headers = { 'User-Agent': 'epik8s-backend/1.0', 'Accept': 'text/plain, */*' };
+    let token = req.headers['x-git-token'];
+    if (auth) {
+      // Keycloak mode: the operator's PAT is never used; only the beamline's own repo is reachable.
+      if (!GIT_REPO || !isAllowedGitUrl(targetUrl, allowedPrefixes(GIT_REPO))) {
+        return res.status(403).json({ error: 'URL is outside the beamline repository' });
+      }
+      Object.assign(headers, gitAuthHeaders(GIT_REPO, GIT_TOKEN));
+      token = null;
+    }
     if (token) {
       // GitLab PAT
       headers['PRIVATE-TOKEN'] = token;
@@ -254,6 +282,50 @@ app.get('/api/v1/git-proxy', async (req, res, next) => {
     if (err.name === 'AbortError') {
       return res.status(504).json({ error: 'Upstream request timed out' });
     }
+    next(err);
+  }
+});
+
+// ─── Git relay (Keycloak mode: server-held credential) ──────────────────
+//
+// ALL /api/v1/git/relay?url=<encoded_url>
+//
+// Forwards any Git-host API call (commit, tree, issues, raw file) with the
+// backend's own GIT_TOKEN. Only URLs under the beamline's repository are
+// relayed. Reads need pv.read, writes config.edit (see auth.js).
+
+const GIT_RELAY_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
+
+app.all('/api/v1/git/relay', async (req, res, next) => {
+  try {
+    if (!GIT_RELAY_METHODS.has(req.method)) return res.status(405).json({ error: 'Method not allowed' });
+    if (!GIT_REPO || !GIT_TOKEN) return res.status(503).json({ error: 'Git relay not configured (GIT_REPO_URL/GIT_TOKEN)' });
+    const targetUrl = req.query.url;
+    if (!targetUrl || !isAllowedGitUrl(targetUrl, allowedPrefixes(GIT_REPO))) {
+      return res.status(403).json({ error: 'URL is outside the beamline repository' });
+    }
+    const headers = { 'User-Agent': 'epik8s-backend/1.0', ...gitAuthHeaders(GIT_REPO, GIT_TOKEN) };
+    const hasBody = req.method !== 'GET' && req.method !== 'DELETE';
+    if (hasBody) headers['Content-Type'] = 'application/json';
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 30000);
+    let upstream;
+    try {
+      upstream = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    res.status(upstream.status);
+    const ct = upstream.headers.get('content-type');
+    if (ct) res.setHeader('Content-Type', ct);
+    res.send(await upstream.text());
+  } catch (err) {
+    if (err.name === 'AbortError') return res.status(504).json({ error: 'Upstream request timed out' });
     next(err);
   }
 });
@@ -950,5 +1022,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`epik8s-backend listening on :${PORT}`);
   console.log(`  namespace       : ${NAMESPACE}`);
   console.log(`  argocd ns       : ${ARGOCD_NAMESPACE}`);
+  console.log(`  keycloak auth   : ${auth ? process.env.OIDC_ISSUER : 'OFF (OIDC_ISSUER unset)'}`);
   console.log(`  websocket       : /ws/chat, /ws/system, /ws/pods/:name/{logs,exec,attach}`);
 });

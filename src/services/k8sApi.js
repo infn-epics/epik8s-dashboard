@@ -11,6 +11,7 @@
  */
 
 import { proxyUrl } from './devProxy.js';
+import { getAccessToken } from './oidc.js';
 
 let _baseUrl = null;
 
@@ -59,6 +60,8 @@ function parseApiBody(text, contentType, path) {
  * Generic authenticated fetch against the backend.
  */
 async function apiFetch(path, token, options = {}) {
+  // Keycloak login: always send the current (auto-refreshed) access token.
+  token = getAccessToken() || token;
   if (!_baseUrl) throw new Error('Backend URL not configured');
   const url = `${_baseUrl}${path}`;
   const resp = await fetch(url, {
@@ -216,6 +219,13 @@ function wsBaseUrl() {
   return _baseUrl.replace(/^http/, 'ws');
 }
 
+/** Browsers cannot set headers on a WebSocket, so the Keycloak token rides in the query. */
+export function addWsToken(params) {
+  const t = getAccessToken();
+  if (t) params.set('access_token', t);
+  return params;
+}
+
 /**
  * Open a streaming log WebSocket for a pod.
  * Returns the WebSocket instance. Caller attaches onmessage/onclose handlers.
@@ -226,6 +236,7 @@ export function streamPodLogs(podName, { container, tailLines = 200 } = {}) {
   const params = new URLSearchParams();
   if (container) params.set('container', container);
   params.set('tailLines', String(tailLines));
+  addWsToken(params);
   return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/logs?${params}`);
 }
 
@@ -239,6 +250,7 @@ export function execPod(podName, { container, cmd = '/bin/sh' } = {}) {
   const params = new URLSearchParams();
   if (container) params.set('container', container);
   params.set('cmd', cmd);
+  addWsToken(params);
   return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/exec?${params}`);
 }
 
@@ -251,6 +263,7 @@ export function attachPod(podName, { container } = {}) {
   if (!base) throw new Error('Backend URL not configured');
   const params = new URLSearchParams();
   if (container) params.set('container', container);
+  addWsToken(params);
   return new WebSocket(`${base}/ws/pods/${encodeURIComponent(podName)}/attach?${params}`);
 }
 

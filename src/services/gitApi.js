@@ -7,7 +7,7 @@
  *   - commitFile: create or update a file via a commit
  */
 
-import { proxyUrl } from './devProxy.js';
+import { gitFetch } from './devProxy.js';
 
 /**
  * Build a raw (unauthenticated) download URL for a file in a repository.
@@ -129,7 +129,7 @@ export async function gitFileExists(repoInfo, filePath, branch = 'main', token =
     if (token) headers['PRIVATE-TOKEN'] = token;
   }
 
-  const resp = await fetch(proxyUrl(url), { headers });
+  const resp = await gitFetch(url, { headers });
   if (resp.status === 404) return false;
   if (!resp.ok) throw new Error(`Git repository listing failed (${resp.status})`);
   const entries = await resp.json();
@@ -180,7 +180,7 @@ async function getFileGitLab({ host, projectPath }, filePath, branch, token) {
   const url = `https://${host}/api/v4/projects/${projectId}/repository/files/${encodedPath}?ref=${encodeURIComponent(branch)}`;
   const headers = {};
   if (token) headers['PRIVATE-TOKEN'] = token;
-  const resp = await fetch(proxyUrl(url), { headers });
+  const resp = await gitFetch(url, { headers });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`GitLab GET file failed (${resp.status}): ${text}`);
@@ -196,12 +196,12 @@ async function commitFileGitLab({ host, projectPath }, filePath, branch, content
   const url = `https://${host}/api/v4/projects/${projectId}/repository/files/${encodedPath}`;
 
   // Determine if the file already exists — GitLab requires POST for create, PUT for update
-  const checkResp = await fetch(proxyUrl(`${url}?ref=${encodeURIComponent(branch)}`), {
+  const checkResp = await gitFetch(`${url}?ref=${encodeURIComponent(branch)}`, {
     headers: { 'PRIVATE-TOKEN': token },
   });
   const method = checkResp.ok ? 'PUT' : 'POST';
 
-  const resp = await fetch(proxyUrl(url), {
+  const resp = await gitFetch(url, {
     method,
     headers: {
       'PRIVATE-TOKEN': token,
@@ -227,7 +227,7 @@ async function getFileGitHub({ projectPath }, filePath, branch, token) {
   const url = `https://api.github.com/repos/${projectPath}/contents/${filePath}?ref=${encodeURIComponent(branch)}`;
   const headers = { Accept: 'application/vnd.github.v3+json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const resp = await fetch(proxyUrl(url), { headers });
+  const resp = await gitFetch(url, { headers });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`GitHub GET file failed (${resp.status}): ${text}`);
@@ -247,7 +247,7 @@ async function commitFileGitHub({ projectPath }, filePath, branch, content, comm
   // If updating an existing file, we need the sha
   if (existingRef) body.sha = existingRef;
 
-  const resp = await fetch(proxyUrl(url), {
+  const resp = await gitFetch(url, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -277,7 +277,7 @@ async function commitFilesGitLab({ host, projectPath }, files, branch, commitMes
   for (const f of files) {
     const encodedPath = encodeURIComponent(f.path);
     const checkUrl = `https://${host}/api/v4/projects/${projectId}/repository/files/${encodedPath}?ref=${encodeURIComponent(branch)}`;
-    const checkResp = await fetch(proxyUrl(checkUrl), { headers: { 'PRIVATE-TOKEN': token } });
+    const checkResp = await gitFetch(checkUrl, { headers: { 'PRIVATE-TOKEN': token } });
     actions.push({
       action: checkResp.ok ? 'update' : 'create',
       file_path: f.path,
@@ -285,7 +285,7 @@ async function commitFilesGitLab({ host, projectPath }, files, branch, commitMes
     });
   }
 
-  const resp = await fetch(proxyUrl(url), {
+  const resp = await gitFetch(url, {
     method: 'POST',
     headers: {
       'PRIVATE-TOKEN': token,

@@ -4,6 +4,7 @@
  * Uses PAT from AuthContext for all API calls.
  */
 import { authHeaders } from './auth.js';
+import { gitFetch } from './devProxy.js';
 
 /**
  * Create an issue on the repository.
@@ -107,7 +108,7 @@ async function uploadFileGitLab({ host, projectPath }, token, file) {
   const url = `https://${host}/api/v4/projects/${projectId}/uploads`;
   const formData = new FormData();
   formData.append('file', file);
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     method: 'POST',
     headers: { 'PRIVATE-TOKEN': token },
     body: formData,
@@ -161,7 +162,7 @@ function fileToDataUrl(file) {
 
 async function createGitHubIssue({ projectPath }, token, { title, body, labels }) {
   const url = `https://api.github.com/repos/${projectPath}/issues`;
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     method: 'POST',
     headers: {
       ...authHeaders('github', token),
@@ -195,7 +196,7 @@ async function listGitHubIssues({ projectPath }, token, { labels, state, perPage
   params.set('page', String(page || 1));
 
   const url = `https://api.github.com/repos/${projectPath}/issues?${params}`;
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     headers: authHeaders('github', token),
   });
   if (!resp.ok) throw new Error(`Failed to list GitHub issues (${resp.status})`);
@@ -213,7 +214,7 @@ async function listGitHubIssues({ projectPath }, token, { labels, state, perPage
 
 async function addGitHubComment({ projectPath }, token, issueNumber, body) {
   const url = `https://api.github.com/repos/${projectPath}/issues/${issueNumber}/comments`;
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     method: 'POST',
     headers: {
       ...authHeaders('github', token),
@@ -230,7 +231,7 @@ async function addGitHubComment({ projectPath }, token, issueNumber, body) {
 async function createGitLabIssue({ host, projectPath }, token, { title, body, labels }) {
   const projectId = encodeURIComponent(projectPath);
   const url = `https://${host}/api/v4/projects/${projectId}/issues`;
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     method: 'POST',
     headers: {
       ...authHeaders('gitlab', token),
@@ -265,7 +266,7 @@ async function listGitLabIssues({ host, projectPath }, token, { labels, state, p
   params.set('page', String(page || 1));
 
   const url = `https://${host}/api/v4/projects/${projectId}/issues?${params}`;
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     headers: authHeaders('gitlab', token),
   });
   if (!resp.ok) throw new Error(`Failed to list GitLab issues (${resp.status})`);
@@ -284,7 +285,7 @@ async function listGitLabIssues({ host, projectPath }, token, { labels, state, p
 async function addGitLabComment({ host, projectPath }, token, issueId, body) {
   const projectId = encodeURIComponent(projectPath);
   const url = `https://${host}/api/v4/projects/${projectId}/issues/${issueId}/notes`;
-  const resp = await fetch(url, {
+  const resp = await gitFetch(url, {
     method: 'POST',
     headers: {
       ...authHeaders('gitlab', token),

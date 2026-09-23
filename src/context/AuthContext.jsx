@@ -22,6 +22,17 @@ import {
   hasRole as checkRole,
 } from '../services/auth.js';
 import { parseGitUrl } from '../services/gitApi.js';
+import {
+  resolveOidcConfig,
+  startLogin,
+  completeLoginIfCallback,
+  restoreSession,
+  refresh as oidcRefresh,
+  logout as oidcLogout,
+  decodeJwt,
+  userFromClaims,
+  setAccessToken,
+} from '../services/oidc.js';
 
 const AuthContext = createContext(null);
 
@@ -35,8 +46,62 @@ export function AuthProvider({ children, giturl }) {
 
   const repoInfo = useMemo(() => parseGitUrl(giturl), [giturl]);
 
+  // Keycloak (OIDC) mode replaces the PAT login when an issuer is resolvable.
+  const oidcCfg = useMemo(() => resolveOidcConfig({
+    search: window.location.search,
+    hostname: window.location.hostname,
+    env: import.meta.env || {},
+  }), []);
+  const [refreshToken, setRefreshToken] = useState(null);
+
+  const applyOidcTokens = useCallback((tokens) => {
+    const u = userFromClaims(decodeJwt(tokens.accessToken));
+    setAccessToken(tokens.accessToken);
+    setUser(u);
+    setToken(tokens.accessToken);
+    setProvider('keycloak');
+    setRole(u?.role || 'viewer');
+    setRefreshToken(tokens.refreshToken);
+  }, []);
+
+  // OIDC: finish a login redirect, or restore the session after a reload.
+  useEffect(() => {
+    if (!oidcCfg) return undefined;
+    let cancelled = false;
+    (async () => {
+      setAuthLoading(true);
+      try {
+        const tokens = (await completeLoginIfCallback(oidcCfg)) || (await restoreSession(oidcCfg));
+        if (tokens && !cancelled) applyOidcTokens(tokens);
+      } catch (err) {
+        if (!cancelled) setAuthError(err.message);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [oidcCfg, applyOidcTokens]);
+
+  // OIDC: renew the short-lived access token shortly before it expires.
+  useEffect(() => {
+    if (!oidcCfg || !refreshToken || !token) return undefined;
+    const exp = decodeJwt(token)?.exp;
+    const ms = Math.max(((exp || 0) * 1000 - Date.now()) - 30000, 5000);
+    const t = setTimeout(async () => {
+      try {
+        applyOidcTokens(await oidcRefresh(oidcCfg, refreshToken));
+      } catch {
+        // Session ended (idle/max lifespan or revoked): drop to logged-out.
+        setAccessToken(null);
+        setUser(null); setToken(null); setProvider(null); setRole('viewer'); setRefreshToken(null);
+      }
+    }, ms);
+    return () => clearTimeout(t);
+  }, [oidcCfg, refreshToken, token, applyOidcTokens]);
+
   // Restore session on mount
   useEffect(() => {
+    if (oidcCfg) return;
     const session = loadSession();
     if (session?.token && session?.user) {
       setUser(session.user);
@@ -48,7 +113,7 @@ export function AuthProvider({ children, giturl }) {
 
   // Refresh role when repoInfo changes and we have a token
   useEffect(() => {
-    if (token && provider && repoInfo) {
+    if (!oidcCfg && token && provider && repoInfo) {
       fetchRepoRole(provider, token, repoInfo)
         .then(r => {
           setRole(r);
@@ -65,6 +130,11 @@ export function AuthProvider({ children, giturl }) {
   }, [token, provider, repoInfo]);
 
   const login = useCallback(async (pat) => {
+    if (oidcCfg) {
+      setAuthError(null);
+      await startLogin(oidcCfg);
+      return;
+    }
     if (!repoInfo) {
       setAuthError('No repository configured (giturl missing)');
       return;
@@ -88,16 +158,21 @@ export function AuthProvider({ children, giturl }) {
     } finally {
       setAuthLoading(false);
     }
-  }, [repoInfo]);
+  }, [repoInfo, oidcCfg]);
 
   const logout = useCallback(() => {
+    if (oidcCfg) {
+      setAccessToken(null);
+      oidcLogout(oidcCfg);
+      return;
+    }
     clearSession();
     setUser(null);
     setToken(null);
     setProvider(null);
     setRole('viewer');
     setAuthError(null);
-  }, []);
+  }, [oidcCfg]);
 
   const hasRoleFn = useCallback((requiredRole) => {
     return checkRole(role, requiredRole);
@@ -112,10 +187,11 @@ export function AuthProvider({ children, giturl }) {
     authError,
     authLoading,
     repoInfo,
+    oidc: !!oidcCfg,
     login,
     logout,
     hasRole: hasRoleFn,
-  }), [user, token, provider, role, authError, authLoading, repoInfo, login, logout, hasRoleFn]);
+  }), [user, token, provider, role, authError, authLoading, repoInfo, oidcCfg, login, logout, hasRoleFn]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
