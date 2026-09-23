@@ -70,7 +70,7 @@ function NavItems({ items }) {
 
 const MAGNET_PROCEDURE_PATHS = [
   '/tools/magnets/array', '/tools/magnets/pretune', '/tools/magnets/save', '/tools/magnets/restore',
-  '/tools/magnets/save-dataset', '/tools/magnets/load-dataset',
+  '/tools/magnets/save-dataset', '/tools/magnets/load-dataset', '/tools/magnets/saveandrestore',
 ];
 
 /**
@@ -81,6 +81,7 @@ const MAGNET_PROCEDURE_PATHS = [
  *   Monitor   — Cameras, Instrumentation
  *   Ops       — K8s, Tickets
  *   Tools     — Procedures > Magnets > Array, Pretune, Save/Restore Snapshot, Save/Load Dataset
+ *             — Services > Save & Restore (browse/create/edit configurations & snapshots)
  *   (global)  — Settings
  *
  * Console panels dock at the bottom and can be popped out.
@@ -211,6 +212,9 @@ export default function AppShell({ children, theme, onToggleTheme }) {
               title: 'Simple load: apply a whole snapshot or dataset' },
           ],
         },
+        { heading: 'Services' },
+        { to: '/tools/magnets/saveandrestore', icon: '🗄', label: 'Save & Restore',
+          title: 'Browse, create and edit save-and-restore configurations and snapshots' },
       ],
     },
   ];

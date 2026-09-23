@@ -49,7 +49,7 @@ export function proxyUrl(url) {
  *
  * Also respects the ?backend= query param override.
  */
-function deriveBackendUrl() {
+export function deriveBackendUrl() {
   if (typeof window === 'undefined') return null;
   const params = new URLSearchParams(window.location.search);
   const override = params.get('backend');

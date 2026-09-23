@@ -19,6 +19,7 @@ import OpsFilesView from './components/views/OpsFilesView.jsx';
 import OpsArchiverView from './components/views/OpsArchiverView.jsx';
 import ArgusView from './components/views/ArgusView.jsx';
 import MagnetArrayView from './components/views/magnets/MagnetArrayView.jsx';
+import SaveAndRestoreView from './components/views/magnets/SaveAndRestoreView.jsx';
 import MagnetPretuneView from './components/views/magnets/MagnetPretuneView.jsx';
 import MagnetSaveView from './components/views/magnets/MagnetSaveView.jsx';
 import MagnetRestoreView from './components/views/magnets/MagnetRestoreView.jsx';
@@ -129,6 +130,7 @@ function AppRoutes() {
                     <Route path="/tools/magnets/restore" element={<MagnetRestoreView />} />
                     <Route path="/tools/magnets/save-dataset" element={<MagnetSaveView simple />} />
                     <Route path="/tools/magnets/load-dataset" element={<MagnetRestoreView simple />} />
+                    <Route path="/tools/magnets/saveandrestore" element={<SaveAndRestoreView />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </AppShell>

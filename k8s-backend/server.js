@@ -258,6 +258,77 @@ app.get('/api/v1/git-proxy', async (req, res, next) => {
   }
 });
 
+// ─── save-and-restore proxy (CORS-free REST access for browser clients) ─
+//
+// ALL /api/v1/saveandrestore-proxy?url=<encoded_url>
+// Optional header  Authorization: Basic <base64>  (the operator's own save-and-restore login)
+//
+// The Phoebus save-and-restore service (org.phoebus service-save-and-restore) sends no
+// Access-Control-Allow-Origin, and its Spring Security filter chain rejects the browser's
+// CORS preflight (OPTIONS) with 401/403 before any CORS header can be added — so the browser
+// blocks every direct request regardless of method. This fetches server-side (no CORS) and
+// relays the response back, exactly like /api/v1/git-proxy above but forwarding any method
+// and an operator-supplied Authorization header (never one of this backend's own credentials)
+// for the create/update/delete calls that need to be authenticated as that operator.
+//
+// Restricted to save-and-restore's own URL shape (host containing "saveandrestore", path
+// under /save-restore) so this can't be used as a general open relay.
+
+const SAVEANDRESTORE_METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE']);
+
+app.all('/api/v1/saveandrestore-proxy', async (req, res, next) => {
+  try {
+    if (!SAVEANDRESTORE_METHODS.has(req.method)) {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).json({ error: 'Missing ?url= parameter' });
+
+    let parsed;
+    try { parsed = new URL(targetUrl); } catch {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return res.status(400).json({ error: 'Only http/https URLs allowed' });
+    }
+    if (!parsed.hostname.includes('saveandrestore') || !parsed.pathname.startsWith('/save-restore')) {
+      return res.status(400).json({ error: 'Only save-and-restore service URLs are allowed' });
+    }
+
+    const headers = { 'User-Agent': 'epik8s-backend/1.0', Accept: 'application/json, */*' };
+    if (req.headers['authorization']) headers['Authorization'] = req.headers['authorization'];
+    const hasBody = req.method !== 'GET';
+    if (hasBody) headers['Content-Type'] = 'application/json';
+
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 15000);
+    let upstream;
+    try {
+      upstream = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        // DELETE /node carries a body (the array of node ids to remove), so only GET is bodyless.
+        body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const text = await upstream.text();
+    res.status(upstream.status);
+    const ct = upstream.headers.get('content-type');
+    if (ct) res.setHeader('Content-Type', ct);
+    res.send(text);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ error: 'Upstream request timed out' });
+    }
+    next(err);
+  }
+});
+
 // ─── Health ─────────────────────────────────────────────────────────────
 
 app.get('/healthz', (_req, res) => {
