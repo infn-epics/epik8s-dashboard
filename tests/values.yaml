@@ -150,19 +150,6 @@ epicsConfiguration:
       pip:
         - bluesky
         - infn-ophyd-hal
-    pws:
-      asset: "Phoebus WEB (experimental)"
-      loglevel: DEBUG
-      charturl: https://baltig.infn.it/epics-containers/phoebus-services-chart.git
-      image:
-        repository: baltig.infn.it:4567/epics-containers/phoebus-web-docker
-      phoebusservice: "pvws"
-      auto_security: true
-      enable_ingress: true
-      autosync: true ## restart automatically on changes
-      service:
-        loglevel: "INFO"
-      usegateway: true
     dbwr:
       asset: "PV REST server (experimental)"
       loglevel: DEBUG
@@ -180,7 +167,7 @@ epicsConfiguration:
           url: https://baltig.infn.it/lnf-da-control/sparc-epics-opi.git
           path: .
       pvws:
-        host: euaps-pws.k8sda.lnf.infn.it
+        host: euaps-pvws.k8sda.lnf.infn.it
         port: 80
     
 
